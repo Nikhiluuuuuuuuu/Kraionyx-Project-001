@@ -1,0 +1,57 @@
+# --------------------------------------------------------------------------
+# Kraionyx Audio Processor — GPU Dockerfile (NVIDIA CUDA 12.1)
+# --------------------------------------------------------------------------
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04 AS base
+
+LABEL maintainer="Kraionyx Team" \
+      service="audio-processor-gpu" \
+      description="GPU-accelerated audio preprocessing microservice"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.11 \
+        python3.11-venv \
+        python3.11-dev \
+        python3-pip \
+        ffmpeg \
+        libsndfile1 \
+        libsndfile1-dev \
+        libgomp1 \
+        curl \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root user
+RUN groupadd -r kraionyx && useradd -r -g kraionyx -m -s /bin/bash kraionyx
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Install shared library
+COPY ../../shared/python /tmp/kraionyx-common
+RUN pip install --no-cache-dir /tmp/kraionyx-common && \
+    rm -rf /tmp/kraionyx-common
+
+# Copy application code
+COPY src/ ./src/
+
+USER kraionyx
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD python -c "import torch; assert torch.cuda.is_available(); import sys; sys.exit(0)" || exit 1
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DEVICE=cuda \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+ENTRYPOINT ["python", "-m", "src.main"]
