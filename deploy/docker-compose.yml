@@ -1,0 +1,302 @@
+# =============================================================================
+# Kraionyx - Full Development Stack
+# HIPAA-Compliant Medical STT & EHR Integration System
+# =============================================================================
+# Usage:
+#   docker compose -f deploy/docker-compose.yml up -d --build
+#   docker compose -f deploy/docker-compose.yml down -v
+# =============================================================================
+
+x-common-env: &common-env
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-debug}
+  KAFKA_BROKERS: kafka-broker:9092
+  REDIS_URL: redis://:${REDIS_PASSWORD:-change_me_in_production}@redis:6379/0
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me_in_production}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:-generate-a-32-byte-base64-key-here}
+
+x-common-healthcheck: &common-healthcheck
+  interval: 15s
+  timeout: 5s
+  retries: 5
+
+x-gpu-deploy: &gpu-deploy
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: 1
+          capabilities: [gpu]
+
+services:
+  # ---------------------------------------------------------------------------
+  # Infrastructure Services
+  # ---------------------------------------------------------------------------
+
+  kafka-broker:
+    image: apache/kafka:3.7
+    container_name: kraionyx-kafka
+    hostname: kafka-broker
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      # KRaft combined mode (no Zookeeper)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-broker:9093
+      # Listeners
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Cluster
+      CLUSTER_ID: kraionyx-kafka-cluster-001
+      # Topic defaults
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 3
+      # Performance tuning
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      <<: *common-healthcheck
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: kraionyx-redis
+    hostname: redis
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-change_me_in_production}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --save 60 1000
+      --tcp-keepalive 60
+      --timeout 300
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change_me_in_production}", "ping"]
+      <<: *common-healthcheck
+      start_period: 5s
+    restart: unless-stopped
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kraionyx-kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: kraionyx-dev
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-broker:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:8080/api/clusters || exit 1"]
+      <<: *common-healthcheck
+      start_period: 15s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Application Services
+  # ---------------------------------------------------------------------------
+
+  api-gateway:
+    build:
+      context: ../services/api-gateway
+      dockerfile: Dockerfile
+    container_name: kraionyx-api-gateway
+    hostname: api-gateway
+    ports:
+      - "${API_GATEWAY_PORT:-8443}:8443"
+    environment:
+      <<: *common-env
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      API_KEY: ${API_KEY:-change_me_in_production}
+      TLS_CERT_PATH: /certs/cert.pem
+      TLS_KEY_PATH: /certs/key.pem
+      LISTEN_ADDR: ":8443"
+    volumes:
+      - ../certs:/certs:ro
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - frontend
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-check-certificate --spider --quiet https://localhost:8443/health || exit 1"]
+      <<: *common-healthcheck
+      start_period: 10s
+    restart: unless-stopped
+
+  audio-processor:
+    build:
+      context: ../services/audio-processor
+      dockerfile: Dockerfile.gpu
+    container_name: kraionyx-audio-processor
+    hostname: audio-processor
+    environment:
+      <<: *common-env
+      HF_TOKEN: ${HF_TOKEN:-}
+      AUDIO_SAMPLE_RATE: ${AUDIO_SAMPLE_RATE:-16000}
+      AUDIO_CHANNELS: ${AUDIO_CHANNELS:-1}
+      AUDIO_BIT_DEPTH: ${AUDIO_BIT_DEPTH:-16}
+      AUDIO_CHUNK_DURATION_MS: ${AUDIO_CHUNK_DURATION_MS:-5000}
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        <<: *gpu-deploy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys; sys.exit(0)' || exit 1"]
+      <<: *common-healthcheck
+      start_period: 20s
+    restart: unless-stopped
+
+  stt-engine:
+    build:
+      context: ../services/stt-engine
+      dockerfile: Dockerfile.gpu
+    container_name: kraionyx-stt-engine
+    hostname: stt-engine
+    environment:
+      <<: *common-env
+      HF_TOKEN: ${HF_TOKEN:-}
+      WHISPER_MODEL: ${WHISPER_MODEL:-large-v3}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cuda}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-float16}
+      WHISPER_BEAM_SIZE: ${WHISPER_BEAM_SIZE:-5}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-en}
+    volumes:
+      - ../models:/models:ro
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+        <<: *gpu-deploy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import faster_whisper; print(\"ok\")' || exit 1"]
+      <<: *common-healthcheck
+      start_period: 60s
+    restart: unless-stopped
+
+  clinical-nlp:
+    build:
+      context: ../services/clinical-nlp
+      dockerfile: Dockerfile.gpu
+    container_name: kraionyx-clinical-nlp
+    hostname: clinical-nlp
+    environment:
+      <<: *common-env
+      HF_TOKEN: ${HF_TOKEN:-}
+      MEDGEMMA_MODEL: ${MEDGEMMA_MODEL:-google/medgemma-4b-it}
+      MEDGEMMA_MAX_TOKENS: ${MEDGEMMA_MAX_TOKENS:-2048}
+      MEDGEMMA_TEMPERATURE: ${MEDGEMMA_TEMPERATURE:-0.3}
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+        <<: *gpu-deploy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import transformers; print(\"ok\")' || exit 1"]
+      <<: *common-healthcheck
+      start_period: 120s
+    restart: unless-stopped
+
+  fhir-adapter:
+    build:
+      context: ../services/fhir-adapter
+      dockerfile: Dockerfile
+    container_name: kraionyx-fhir-adapter
+    hostname: fhir-adapter
+    environment:
+      <<: *common-env
+      FHIR_SERVER_URL: ${FHIR_SERVER_URL:-http://hapi-fhir:8080/fhir}
+      FHIR_CLIENT_ID: ${FHIR_CLIENT_ID:-}
+      FHIR_CLIENT_SECRET: ${FHIR_CLIENT_SECRET:-}
+    depends_on:
+      kafka-broker:
+        condition: service_healthy
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://localhost:8080/health || exit 1"]
+      <<: *common-healthcheck
+      start_period: 10s
+    restart: unless-stopped
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  frontend:
+    driver: bridge
+    name: kraionyx-frontend
+  backend:
+    driver: bridge
+    name: kraionyx-backend
+    internal: true
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  kafka-data:
+    driver: local
+    name: kraionyx-kafka-data
+  redis-data:
+    driver: local
+    name: kraionyx-redis-data
