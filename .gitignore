@@ -1,0 +1,126 @@
+# ============================================================================
+# Kraionyx Project - .gitignore
+# Go + Python + Docker monorepo for HIPAA-compliant medical STT & EHR system
+# ============================================================================
+
+# ---- Go ----
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+*.pprof
+vendor/
+bin/
+cover.out
+coverage.html
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.venv/
+venv/
+env/
+.Python
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.whl
+share/python-wheels/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+
+# ---- Docker ----
+docker-compose.override.yml
+.docker/
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.iml
+.editorconfig.bak
+
+# ---- Secrets & Certificates ----
+# CRITICAL: Never commit secrets to version control
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+certs/
+!certs/.gitkeep
+
+# ---- ML Models ----
+# Large model files must not be in git
+models/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+*.gguf
+*.ggml
+
+# ---- OS ----
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---- Protobuf Generated ----
+gen/
+
+# ---- Logs & Temp ----
+*.log
+logs/
+tmp/
+temp/
+
+# ---- Terraform / IaC (future) ----
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
