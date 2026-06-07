@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package kraionyx.v1;
+
+option go_package = "github.com/kraionyx/shared/gen/kraionyx/v1;kraionyxv1";
+
+// =============================================================================
+// FHIRPushRequest — Request to push a clinical artifact to an EHR system
+// via FHIR R4 API. Consumed from the "fhir.outbound" Kafka topic.
+// =============================================================================
+message FHIRPushRequest {
+  // Session that produced this clinical artifact
+  string session_id = 1;
+
+  // FHIR R4 resource type (e.g., "DocumentReference", "DiagnosticReport")
+  string resource_type = 2;
+
+  // Serialized FHIR R4 JSON resource body
+  string fhir_json = 3;
+
+  // Target EHR FHIR server base URL
+  string target_ehr_url = 4;
+
+  // FHIR Patient resource ID on the target system
+  string patient_fhir_id = 5;
+
+  // FHIR Encounter resource ID on the target system
+  string encounter_fhir_id = 6;
+}
+
+// =============================================================================
+// FHIRPushResponse — Result of a FHIR resource push operation.
+// =============================================================================
+message FHIRPushResponse {
+  string session_id = 1;
+
+  // Whether the push succeeded (HTTP 2xx)
+  bool success = 2;
+
+  // FHIR resource ID assigned by the target EHR
+  string resource_id = 3;
+
+  // Human-readable error message (empty on success)
+  string error_message = 4;
+
+  // HTTP status code returned by the FHIR server
+  int32 http_status_code = 5;
+
+  // Unix timestamp in milliseconds when the push completed
+  int64 pushed_at_ms = 6;
+}
+
+// =============================================================================
+// FHIRAdapterService — gRPC service for EHR integration.
+// =============================================================================
+service FHIRAdapterService {
+  // Push a FHIR resource to the configured EHR system.
+  rpc PushToEHR(FHIRPushRequest) returns (FHIRPushResponse);
+
+  // Retrieve the status of a previously submitted push operation.
+  rpc GetPushStatus(GetPushStatusRequest) returns (FHIRPushResponse);
+}
+
+message GetPushStatusRequest {
+  string session_id = 1;
+}

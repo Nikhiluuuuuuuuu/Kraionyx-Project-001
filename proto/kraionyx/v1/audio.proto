@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package kraionyx.v1;
+
+option go_package = "github.com/kraionyx/shared/gen/kraionyx/v1;kraionyxv1";
+
+// =============================================================================
+// AudioChunk — Represents a single encrypted audio fragment from a session.
+// Produced to the "audio.raw.chunks" Kafka topic by the API Gateway.
+// =============================================================================
+message AudioChunk {
+  // Unique session identifier (UUID v7 for time-ordering)
+  string session_id = 1;
+
+  // Zero-based index of this chunk within the session
+  int32 chunk_index = 2;
+
+  // Unix timestamp in milliseconds when this chunk was captured
+  int64 timestamp_ms = 3;
+
+  // Encrypted audio bytes (AES-256-GCM envelope)
+  bytes audio_data = 4;
+
+  // Format of the audio data
+  AudioFormat format = 5;
+
+  // Arbitrary key-value metadata (e.g., device info, sample rate)
+  map<string, string> metadata = 6;
+}
+
+// =============================================================================
+// AudioFormat — Supported audio encoding formats
+// =============================================================================
+enum AudioFormat {
+  AUDIO_FORMAT_UNSPECIFIED = 0;
+  AUDIO_FORMAT_PCM_16KHZ = 1;
+  AUDIO_FORMAT_OPUS = 2;
+  AUDIO_FORMAT_WAV = 3;
+}
+
+// =============================================================================
+// AudioSession — Tracks the lifecycle of an audio recording session.
+// =============================================================================
+message AudioSession {
+  string session_id = 1;
+
+  // FHIR Patient resource reference
+  string patient_id = 2;
+
+  // FHIR Practitioner resource reference
+  string practitioner_id = 3;
+
+  // FHIR Encounter resource reference
+  string encounter_id = 4;
+
+  // Unix timestamp in milliseconds
+  int64 start_time_ms = 5;
+  int64 end_time_ms = 6;
+
+  SessionStatus status = 7;
+}
+
+// =============================================================================
+// SessionStatus — Lifecycle states of an audio session
+// =============================================================================
+enum SessionStatus {
+  SESSION_STATUS_UNSPECIFIED = 0;
+  SESSION_STATUS_ACTIVE = 1;
+  SESSION_STATUS_CLOSED = 2;
+  SESSION_STATUS_ERROR = 3;
+}
+
+// =============================================================================
+// AudioIngestionService — gRPC service for streaming audio into the pipeline.
+// The API Gateway acts as a WebSocket-to-gRPC bridge.
+// =============================================================================
+service AudioIngestionService {
+  // Stream audio chunks from client to server; returns the session summary.
+  rpc StreamAudio(stream AudioChunk) returns (AudioSession);
+
+  // Retrieve an existing session by ID.
+  rpc GetSession(GetSessionRequest) returns (AudioSession);
+
+  // Close an active session and trigger downstream processing.
+  rpc CloseSession(CloseSessionRequest) returns (AudioSession);
+}
+
+message GetSessionRequest {
+  string session_id = 1;
+}
+
+message CloseSessionRequest {
+  string session_id = 1;
+}
