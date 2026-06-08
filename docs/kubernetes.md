@@ -1,0 +1,75 @@
+# Kubernetes & Helm Deployment
+
+This document outlines the deployment strategy for the Kraionyx platform on Kubernetes, utilizing Helm, Istio for mTLS, and HashiCorp Vault for secrets management and sidecar injection.
+
+## Overview
+
+The Kraionyx platform uses a microservices architecture deployed via Helm charts. The deployment is designed to be highly available, secure, and observable.
+
+**Key Components:**
+- **Helm Charts**: Located in `deploy/helm/`, providing templated Kubernetes manifests for all services.
+- **Istio Service Mesh**: Enforces strict zero-trust mTLS for all inter-service communications.
+- **HashiCorp Vault**: Manages secrets and dynamically injects them into pods using the Vault Agent Injector.
+
+## Prerequisites
+
+- Kubernetes cluster (v1.28+)
+- `kubectl` configured
+- `helm` (v3+)
+- Istio installed and configured
+- HashiCorp Vault installed with Kubernetes auth enabled
+
+## Directory Structure
+
+```
+deploy/helm/
+├── kraionyx/
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── charts/
+│   │   ├── api-gateway/
+│   │   ├── audio-processor/
+│   │   ├── stt-engine/
+│   │   ├── clinical-nlp/
+│   │   └── fhir-adapter/
+│   └── templates/
+```
+
+## Deployment Steps
+
+### 1. Configure Vault
+
+Ensure Vault is running and the Kubernetes auth method is enabled. The Vault Agent Injector will automatically inject secrets based on pod annotations.
+
+### 2. Install Istio
+
+Ensure the `istio-injection=enabled` label is present on the namespace where Kraionyx will be deployed.
+
+```bash
+kubectl create namespace kraionyx-prod
+kubectl label namespace kraionyx-prod istio-injection=enabled
+```
+
+### 3. Deploy using Helm
+
+Customize the `values.yaml` file according to your environment. Specifically, update Vault addresses, image tags, and resource limits.
+
+```bash
+helm upgrade --install kraionyx ./deploy/helm/kraionyx \
+  --namespace kraionyx-prod \
+  -f ./deploy/helm/kraionyx/values-prod.yaml
+```
+
+### 4. Verify Deployment
+
+Check the status of the pods and ensure all containers (including Istio proxy and Vault sidecars) are running.
+
+```bash
+kubectl get pods -n kraionyx-prod
+```
+
+## Security Posture
+
+- **mTLS**: Automatically enforced by Istio. Services will reject non-mTLS traffic.
+- **Secrets**: No secrets are stored in Kubernetes ConfigMaps or Secrets. Vault Agent injects them directly into the pod's memory.
+- **Network Policies**: Default deny-all, explicitly allowing only required traffic.
