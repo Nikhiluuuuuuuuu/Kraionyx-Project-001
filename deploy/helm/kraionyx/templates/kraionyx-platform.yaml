@@ -1,0 +1,298 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: default
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# api-gateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-api-gateway
+  labels:
+    app: api-gateway
+spec:
+  replicas: {{ .Values.apiGateway.replicaCount }}
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "kraionyx-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/api-gateway"
+        vault.hashicorp.com/agent-inject-template-config: |
+          {{`{{- with secret "secret/data/kraionyx/api-gateway" -}}`}}
+          {{`{{ range $k, $v := .Data.data }}`}}
+          export {{`{{ $k }}`}}={{`{{ $v }}`}}
+          {{`{{ end }}`}}
+          {{`{{- end -}}`}}
+        proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
+    spec:
+      containers:
+        - name: api-gateway
+          image: "{{ .Values.apiGateway.image }}"
+          ports:
+            - containerPort: {{ .Values.apiGateway.port }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-api-gateway
+  labels:
+    app: api-gateway
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.apiGateway.port }}
+      targetPort: {{ .Values.apiGateway.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: api-gateway
+
+---
+# fhir-adapter
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-fhir-adapter
+  labels:
+    app: fhir-adapter
+spec:
+  replicas: {{ .Values.fhirAdapter.replicaCount }}
+  selector:
+    matchLabels:
+      app: fhir-adapter
+  template:
+    metadata:
+      labels:
+        app: fhir-adapter
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "kraionyx-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/fhir-adapter"
+        vault.hashicorp.com/agent-inject-template-config: |
+          {{`{{- with secret "secret/data/kraionyx/fhir-adapter" -}}`}}
+          {{`{{ range $k, $v := .Data.data }}`}}
+          export {{`{{ $k }}`}}={{`{{ $v }}`}}
+          {{`{{ end }}`}}
+          {{`{{- end -}}`}}
+        proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
+    spec:
+      containers:
+        - name: fhir-adapter
+          image: "{{ .Values.fhirAdapter.image }}"
+          ports:
+            - containerPort: {{ .Values.fhirAdapter.port }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-fhir-adapter
+  labels:
+    app: fhir-adapter
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.fhirAdapter.port }}
+      targetPort: {{ .Values.fhirAdapter.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: fhir-adapter
+
+---
+# clinical-nlp
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-clinical-nlp
+  labels:
+    app: clinical-nlp
+spec:
+  replicas: {{ .Values.clinicalNlp.replicaCount }}
+  selector:
+    matchLabels:
+      app: clinical-nlp
+  template:
+    metadata:
+      labels:
+        app: clinical-nlp
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "kraionyx-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/clinical-nlp"
+        vault.hashicorp.com/agent-inject-template-config: |
+          {{`{{- with secret "secret/data/kraionyx/clinical-nlp" -}}`}}
+          {{`{{ range $k, $v := .Data.data }}`}}
+          export {{`{{ $k }}`}}={{`{{ $v }}`}}
+          {{`{{ end }}`}}
+          {{`{{- end -}}`}}
+        proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
+    spec:
+      containers:
+        - name: clinical-nlp
+          image: "{{ .Values.clinicalNlp.image }}"
+          ports:
+            - containerPort: {{ .Values.clinicalNlp.port }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-clinical-nlp
+  labels:
+    app: clinical-nlp
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.clinicalNlp.port }}
+      targetPort: {{ .Values.clinicalNlp.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: clinical-nlp
+
+---
+# stt-engine
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-stt-engine
+  labels:
+    app: stt-engine
+spec:
+  replicas: {{ .Values.sttEngine.replicaCount }}
+  selector:
+    matchLabels:
+      app: stt-engine
+  template:
+    metadata:
+      labels:
+        app: stt-engine
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "kraionyx-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/stt-engine"
+        vault.hashicorp.com/agent-inject-template-config: |
+          {{`{{- with secret "secret/data/kraionyx/stt-engine" -}}`}}
+          {{`{{ range $k, $v := .Data.data }}`}}
+          export {{`{{ $k }}`}}={{`{{ $v }}`}}
+          {{`{{ end }}`}}
+          {{`{{- end -}}`}}
+        proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
+    spec:
+      containers:
+        - name: stt-engine
+          image: "{{ .Values.sttEngine.image }}"
+          ports:
+            - containerPort: {{ .Values.sttEngine.port }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-stt-engine
+  labels:
+    app: stt-engine
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.sttEngine.port }}
+      targetPort: {{ .Values.sttEngine.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: stt-engine
+
+---
+# audio-processor
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-audio-processor
+  labels:
+    app: audio-processor
+spec:
+  replicas: {{ .Values.audioProcessor.replicaCount }}
+  selector:
+    matchLabels:
+      app: audio-processor
+  template:
+    metadata:
+      labels:
+        app: audio-processor
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "kraionyx-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/audio-processor"
+        vault.hashicorp.com/agent-inject-template-config: |
+          {{`{{- with secret "secret/data/kraionyx/audio-processor" -}}`}}
+          {{`{{ range $k, $v := .Data.data }}`}}
+          export {{`{{ $k }}`}}={{`{{ $v }}`}}
+          {{`{{ end }}`}}
+          {{`{{- end -}}`}}
+        proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
+    spec:
+      containers:
+        - name: audio-processor
+          image: "{{ .Values.audioProcessor.image }}"
+          ports:
+            - containerPort: {{ .Values.audioProcessor.port }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-audio-processor
+  labels:
+    app: audio-processor
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.audioProcessor.port }}
+      targetPort: {{ .Values.audioProcessor.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: audio-processor

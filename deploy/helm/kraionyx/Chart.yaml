@@ -1,6 +1,19 @@
 apiVersion: v2
 name: kraionyx
-description: A Helm chart for deploying Kraionyx Microservices
+description: A Helm chart for Kraionyx Platform
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
+dependencies:
+  - name: kafka
+    version: 26.5.1
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+  - name: redis
+    version: 18.2.0
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: vault
+    version: 0.27.0
+    repository: https://helm.releases.hashicorp.com
+    condition: vault.enabled
