@@ -18,21 +18,27 @@ C4Context
         System(stt, "STT Engine", "Python, Whisper Large-V3", "High-performance transcription via LoRA + Indic Support")
         System(nlp, "Clinical NLP", "Python, Llama-3.1/Sarvam-1", "Extractor, Synthesizer, Verifier agents + BGE-m3 LRU Eviction")
         System(fhir, "FHIR Adapter", "Go", "Formats and pushes records to EHR with Exp Backoff & DLQ")
+        
+        System(vault, "HashiCorp Vault", "Go", "Secrets management and dynamic mTLS PKI")
+        System(keycloak, "Keycloak", "Java", "Identity and Access Management, Enterprise RBAC")
     }
     
     System_Ext(ehr, "EHR System", "Hospital Electronic Health Records")
     
     Rel(practitioner, api_gw, "Streams audio via WebSockets", "WSS")
-    Rel(api_gw, kafka, "Publishes raw chunks", "TCP")
-    Rel(api_gw, redis, "Buffers state & sessions", "TCP")
-    Rel(kafka, audio_proc, "Consumes raw chunks", "TCP")
-    Rel(audio_proc, redis, "Reassembles chunks", "TCP")
-    Rel(audio_proc, kafka, "Publishes preprocessed audio", "TCP")
-    Rel(kafka, stt, "Consumes preprocessed audio", "TCP")
-    Rel(stt, kafka, "Publishes transcripts", "TCP")
-    Rel(kafka, nlp, "Consumes transcripts", "TCP")
-    Rel(nlp, kafka, "Publishes SOAP notes", "TCP")
-    Rel(kafka, fhir, "Consumes SOAP notes", "TCP")
+    Rel(practitioner, keycloak, "Authenticates and gets JWT", "HTTPS")
+    Rel(api_gw, keycloak, "Validates JWT / RBAC", "mTLS")
+    Rel(api_gw, vault, "Fetches dynamic DB/API credentials", "mTLS")
+    Rel(api_gw, kafka, "Publishes raw chunks", "mTLS")
+    Rel(api_gw, redis, "Buffers state & sessions", "mTLS")
+    Rel(kafka, audio_proc, "Consumes raw chunks", "mTLS")
+    Rel(audio_proc, redis, "Reassembles chunks", "mTLS")
+    Rel(audio_proc, kafka, "Publishes preprocessed audio", "mTLS")
+    Rel(kafka, stt, "Consumes preprocessed audio", "mTLS")
+    Rel(stt, kafka, "Publishes transcripts", "mTLS")
+    Rel(kafka, nlp, "Consumes transcripts", "mTLS")
+    Rel(nlp, kafka, "Publishes SOAP notes", "mTLS")
+    Rel(kafka, fhir, "Consumes SOAP notes", "mTLS")
     Rel(fhir, ehr, "Pushes FHIR R4 resources", "HTTPS")
 ```
 
@@ -372,3 +378,79 @@ Implement **Microsoft Presidio** acting primarily through optimized regex behavi
 
 - **Positive**: Increased confidence in HIPAA and DPDPA compliance, lower false-negative rates for PHI leakage.
 - **Negative**: Requires careful tuning to avoid over-redacting valid clinical terms.
+
+---
+
+## ADR-013: Zero-Trust mTLS Inter-Service Communication
+
+**Status:** Accepted
+**Date:** 2026-06
+
+### Context
+
+To meet Tier-1 Production standard security, internal network isolation (Docker networks/Kubernetes namespaces) is insufficient against lateral movement.
+
+### Decision
+
+Enforce **mTLS (Mutual TLS)** across all internal service communications, managed via automated PKI.
+
+### Rationale
+
+- Ensures strict identity verification and encryption in transit for every internal hop.
+- Mitigates insider threats and limits the blast radius of a compromised container.
+
+### Consequences
+
+- **Positive**: Hardened zero-trust architecture.
+- **Negative**: Adds overhead to internal network calls and increases complexity in certificate lifecycle management.
+
+---
+
+## ADR-014: Enterprise-Grade RBAC with Keycloak
+
+**Status:** Accepted
+**Date:** 2026-06
+
+### Context
+
+As Kraionyx is deployed across varied hospital networks, we need an identity provider capable of federating with hospital Active Directories (LDAP, SAML, OIDC) while providing granular RBAC (Role-Based Access Control).
+
+### Decision
+
+Implement **Keycloak** as the primary Identity and Access Management (IAM) and RBAC solution.
+
+### Rationale
+
+- **Federation**: Easily integrates with existing healthcare identity systems.
+- **Granular RBAC**: Allows strict control over who can view transcripts, push to EHRs, or manage system configuration.
+- **Standardized**: Issues JWTs that all downstream services can validate statelessly.
+
+### Consequences
+
+- **Positive**: Offloads complex auth logic from the API Gateway, standardizes enterprise integration.
+- **Negative**: Adds a heavyweight Java service to the infrastructure footprint.
+
+---
+
+## ADR-015: Secrets Management with HashiCorp Vault
+
+**Status:** Accepted
+**Date:** 2026-06
+
+### Context
+
+Hardcoding secrets in `.env` files or relying purely on Kubernetes Secrets (which are base64 encoded by default) doesn't meet our strict compliance rules. We need centralized secret rotation and dynamic certificate provisioning for mTLS.
+
+### Decision
+
+Adopt **HashiCorp Vault** for centralized secrets management and PKI for dynamic mTLS certificates.
+
+### Rationale
+
+- Provides secure storage with encryption-at-rest for EHR API keys, database credentials, and Master Encryption Keys.
+- Functions as an internal CA, issuing short-lived mTLS certificates dynamically to services on boot.
+
+### Consequences
+
+- **Positive**: Simplifies compliance audits, automates key rotation, ensures secrets are injected only at runtime.
+- **Negative**: Introduces a critical dependency; if Vault goes down, services cannot boot or rotate keys.

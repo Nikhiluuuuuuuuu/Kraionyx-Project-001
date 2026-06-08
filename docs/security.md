@@ -19,14 +19,16 @@ graph TD
 
     subgraph "Trust Boundary 1: Perimeter (Frontend Network)"
         WAF["WAF & DDoS Protection"]
-        API["API Gateway<br/>(TLS Termination, Auth)"]
+        API["API Gateway<br/>(TLS Termination)"]
+        Keycloak["Keycloak<br/>(IAM & RBAC)"]
     end
 
-    subgraph "Trust Boundary 2: Processing (Backend Network)"
+    subgraph "Trust Boundary 2: Processing (Backend Network / mTLS Enforced)"
         Kafka["Kafka Event Bus<br/>(mTLS)"]
-        Redis["Redis Cache<br/>(Data at Rest Encryption)"]
-        ML["ML Pipeline<br/>(Isolated from external access)"]
-        FHIR["FHIR Adapter"]
+        Redis["Redis Cache<br/>(mTLS + At Rest Encryption)"]
+        ML["ML Pipeline<br/>(mTLS Isolated)"]
+        FHIR["FHIR Adapter<br/>(mTLS)"]
+        Vault["HashiCorp Vault<br/>(Secrets & PKI)"]
     end
     
     subgraph "Trust Boundary 3: Partner Network"
@@ -37,17 +39,19 @@ graph TD
     Attacker -.-> |"Threat: Credential Theft"| Internet
     Attacker -.-> |"Threat: Eavesdropping"| Internet
     WAF --> API
-    API --> |"Sanitized/Authenticated Traffic"| Kafka
-    API --> Redis
-    Kafka <--> ML
-    Kafka <--> FHIR
+    WAF --> Keycloak
+    API --> |"Validates JWT / mTLS"| Kafka
+    API --> |"mTLS"| Redis
+    API --> |"Fetches DB credentials via mTLS"| Vault
+    Kafka <--> |"mTLS"| ML
+    Kafka <--> |"mTLS"| FHIR
     FHIR --> |"TLS 1.2+"| EHR
     
     classDef threat fill:#fecaca,stroke:#dc2626,stroke-width:2px;
     classDef secure fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
     
     class Attacker threat;
-    class WAF,API,Kafka,Redis,ML,FHIR secure;
+    class WAF,API,Kafka,Redis,ML,FHIR,Vault,Keycloak secure;
 ```
 
 ---
@@ -90,8 +94,8 @@ Kraionyx is designed to comply with the following regulations when deployed with
 | Component | Protocol | Minimum Version | Cipher Suites |
 |-----------|----------|----------------|---------------|
 | Client → API Gateway | TLS | 1.3 | TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256 |
-| API Gateway → Kafka | PLAINTEXT (dev) / TLS (prod) | 1.3 | Same as above |
-| Inter-service (Docker) | Internal network | N/A | Network isolation (internal: true) |
+| API Gateway → Kafka | mTLS | 1.3 | Same as above |
+| Inter-service (Backend) | mTLS | 1.3 | Enforced via HashiCorp Vault PKI |
 | FHIR Adapter → EHR | TLS | 1.2+ | Per EHR vendor requirements |
 
 **Production TLS Configuration (Go)**:
@@ -105,6 +109,13 @@ tlsConfig := &tls.Config{
     },
 }
 ```
+
+### 2.1.1 mTLS Enforcement Policy
+
+Kraionyx enforces strict **Zero-Trust mTLS** across all internal backend services:
+1. **Dynamic Certificates**: HashiCorp Vault acts as the internal Certificate Authority (CA). Services request short-lived mTLS certificates on boot.
+2. **Strict Verification**: Every service requires client certificates (`ClientAuth: tls.RequireAndVerifyClientCert`) for all inbound connections (e.g., Redis, Kafka, and any internal gRPC/HTTP endpoints).
+3. **No Fallback**: PLAINTEXT connections are rejected at the network and application layers in staging and production.
 
 ### 2.2 Encryption at Rest
 
@@ -274,10 +285,11 @@ Master Key (ENCRYPTION_KEY)
 
 | Key | Rotation Frequency | Method |
 |-----|-------------------|--------|
-| Master Key (ENCRYPTION_KEY) | 90 days | Rolling update: decrypt with old, re-encrypt with new |
-| JWT_SECRET | 30 days | Token expiry handles transition |
-| API_KEY | On demand | Issue new key, revoke old |
+| Master Key (ENCRYPTION_KEY) | 90 days | Automated via HashiCorp Vault |
+| JWT_SECRET | 30 days | Keycloak automatic key rotation |
+| API_KEY | On demand | Vault dynamic secret generation / revocation |
 | TLS certificates | 90 days (dev), 1 year (prod) | Automated via cert-manager or ACME |
+| mTLS certificates | 24 hours | Vault PKI secret engine (dynamic) |
 | Session DEK | Per session | Automatically generated and destroyed |
 
 ### 6.3 Key Storage (Production)
@@ -285,8 +297,7 @@ Master Key (ENCRYPTION_KEY)
 | Environment | Key Storage | Notes |
 |------------|-------------|-------|
 | Development | `.env` file (gitignored) | Local only, never committed |
-| Staging | Docker Secrets / HashiCorp Vault | Encrypted at rest |
-| Production | AWS KMS / GCP KMS / Azure Key Vault | Hardware-backed, audited |
+| Staging / Prod | **HashiCorp Vault** | Encrypted at rest, tightly integrated via Kubernetes Service Accounts |
 
 ### 6.4 Emergency Key Revocation
 
@@ -349,24 +360,38 @@ graph TB
 
 ## 8. Authentication & Authorization
 
-### 8.1 Client Authentication
+### 8.1 Client Authentication & IAM
+
+Authentication is delegated to **Keycloak**, which provides enterprise-grade Identity and Access Management (IAM):
 
 ```
+Client → Keycloak: Authenticate (OAuth2 / OIDC)
+Keycloak → Client: Return signed JWT
 Client → API Gateway:
-  Option A: HTTP Header    → X-API-Key: <api_key>
-  Option B: Query Param    → ?api_key=<api_key>
-  Option C: Bearer Token   → Authorization: Bearer <jwt_token>
+  Option A: Bearer Token   → Authorization: Bearer <jwt_token>
 ```
+*Note: API keys for programmatic access are issued and rotated via HashiCorp Vault.*
 
-### 8.2 JWT Token Structure
+### 8.2 Enterprise RBAC (Role-Based Access Control)
+
+Keycloak enforces fine-grained RBAC mapping to hospital AD groups. Example roles include:
+- `kraionyx_practitioner`: Can record audio, view own sessions, and edit own drafts.
+- `kraionyx_reviewer`: Can review and finalize SOAP notes for a specific department.
+- `kraionyx_admin`: System configuration and audit log access.
+
+### 8.3 JWT Token Structure
+
+Tokens generated by Keycloak include these roles:
 
 ```json
 {
   "sub": "practitioner_id",
-  "iss": "kraionyx",
+  "iss": "https://auth.kraionyx.io/realms/medical",
   "iat": 1702600000,
   "exp": 1702603600,
-  "scope": ["audio:write", "session:read", "session:close"],
+  "realm_access": {
+    "roles": ["kraionyx_practitioner"]
+  },
   "practitioner_id": "pract_abc123",
   "organization_id": "org_xyz789"
 }
