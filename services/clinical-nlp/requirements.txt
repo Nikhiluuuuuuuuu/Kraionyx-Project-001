@@ -6,3 +6,7 @@ spacy>=3.7.0
 confluent-kafka>=2.3.0
 faiss-cpu>=1.7.4
 numpy>=1.24.0
+python-dotenv>=1.0.0
+hvac>=2.1.0
+prometheus-client>=0.20.0
+redis>=5.0.0

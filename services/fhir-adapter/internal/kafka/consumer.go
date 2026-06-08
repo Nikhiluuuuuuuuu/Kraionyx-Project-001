@@ -14,19 +14,17 @@ type Consumer struct {
 	dlqTopic string
 }
 
-func NewConsumer(brokers []string, group, dlqTopic string) (*Consumer, error) {
-	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS13,
-		CipherSuites: []uint16{
-			tls.TLS_AES_256_GCM_SHA384,
-		},
-	}
-
-	client, err := kgo.NewClient(
+func NewConsumer(brokers []string, group, dlqTopic string, tlsConfig *tls.Config) (*Consumer, error) {
+	opts := []kgo.Opt{
 		kgo.SeedBrokers(brokers...),
 		kgo.ConsumerGroup(group),
-		kgo.DialTLSConfig(tlsConfig),
-	)
+	}
+
+	if tlsConfig != nil {
+		opts = append(opts, kgo.DialTLSConfig(tlsConfig))
+	}
+
+	client, err := kgo.NewClient(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka consumer: %w", err)
 	}

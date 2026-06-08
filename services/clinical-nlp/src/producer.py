@@ -1,12 +1,23 @@
 import json
 import logging
 from confluent_kafka import Producer as KafkaProducer
+from .config import Config
 
 logger = logging.getLogger(__name__)
 
 class ClinicalProducer:
-    def __init__(self, broker: str):
-        self.producer = KafkaProducer({'bootstrap.servers': broker})
+    def __init__(self, config: Config):
+        kafka_conf = {
+            "bootstrap.servers": config.kafka_brokers,
+        }
+        if config.kafka_security_protocol == "SSL":
+            kafka_conf.update({
+                "security.protocol": "SSL",
+                "ssl.ca.location": config.kafka_ssl_cafile,
+                "ssl.certificate.location": config.kafka_ssl_certfile,
+                "ssl.key.location": config.kafka_ssl_keyfile,
+            })
+        self.producer = KafkaProducer(kafka_conf)
 
     def delivery_report(self, err, msg):
         if err is not None:

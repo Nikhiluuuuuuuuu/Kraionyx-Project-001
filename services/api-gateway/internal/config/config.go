@@ -25,7 +25,7 @@ type Config struct {
 	KafkaBrokers []string
 	// EncryptionKey is the base64-encoded 32-byte AES-256 encryption key.
 	EncryptionKey string
-	// JWTSecret is the secret used for JWT token verification.
+	// JWTSecret is the secret used for JWT token verification. (Deprecating in favor of Keycloak)
 	JWTSecret string
 	// APIKey is the expected API key for X-API-Key authentication.
 	APIKey string
@@ -33,6 +33,19 @@ type Config struct {
 	Environment string
 	// LogLevel is the slog log level ("debug", "info", "warn", "error").
 	LogLevel string
+
+	// Vault configurations
+	VaultAddress string
+	VaultToken   string
+
+	// Keycloak configurations
+	KeycloakIssuer   string
+	KeycloakClientID string
+
+	// Client mTLS
+	ClientCertFile string
+	ClientKeyFile  string
+	CACertFile     string
 }
 
 // Load reads configuration from environment variables and returns a validated
@@ -45,11 +58,18 @@ func Load() (*Config, error) {
 		RedisURL:      getEnvOrDefault("REDIS_URL", "localhost:6379"),
 		RedisPassword: os.Getenv("REDIS_PASSWORD"),
 		KafkaBrokers:  strings.Split(getEnvOrDefault("KAFKA_BROKERS", "localhost:9092"), ","),
-		EncryptionKey: os.Getenv("ENCRYPTION_KEY"),
-		JWTSecret:     os.Getenv("JWT_SECRET"),
-		APIKey:        os.Getenv("API_KEY"),
-		Environment:   getEnvOrDefault("ENVIRONMENT", "development"),
-		LogLevel:      getEnvOrDefault("LOG_LEVEL", "info"),
+		EncryptionKey:    os.Getenv("ENCRYPTION_KEY"),
+		JWTSecret:        os.Getenv("JWT_SECRET"),
+		APIKey:           os.Getenv("API_KEY"),
+		Environment:      getEnvOrDefault("ENVIRONMENT", "development"),
+		LogLevel:         getEnvOrDefault("LOG_LEVEL", "info"),
+		VaultAddress:     getEnvOrDefault("VAULT_ADDR", "http://localhost:8200"),
+		VaultToken:       os.Getenv("VAULT_TOKEN"),
+		KeycloakIssuer:   getEnvOrDefault("KEYCLOAK_ISSUER", "http://localhost:8080/realms/kraionyx"),
+		KeycloakClientID: getEnvOrDefault("KEYCLOAK_CLIENT_ID", "api-gateway"),
+		ClientCertFile:   getEnvOrDefault("CLIENT_CERT_FILE", "certs/client.crt"),
+		ClientKeyFile:    getEnvOrDefault("CLIENT_KEY_FILE", "certs/client.key"),
+		CACertFile:       getEnvOrDefault("CA_CERT_FILE", "certs/ca.crt"),
 	}
 
 	if err := cfg.validate(); err != nil {
