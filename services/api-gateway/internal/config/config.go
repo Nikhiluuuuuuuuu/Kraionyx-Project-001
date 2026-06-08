@@ -21,6 +21,8 @@ type Config struct {
 	RedisURL string
 	// RedisPassword is the Redis authentication password.
 	RedisPassword string
+	// PostgresURL is the connection string for the PostgreSQL database used by the consent module.
+	PostgresURL string
 	// KafkaBrokers is a comma-separated list of Kafka broker addresses.
 	KafkaBrokers []string
 	// EncryptionKey is the base64-encoded 32-byte AES-256 encryption key.
@@ -57,6 +59,7 @@ func Load() (*Config, error) {
 		TLSKeyFile:    getEnvOrDefault("TLS_KEY_FILE", "certs/server.key"),
 		RedisURL:      getEnvOrDefault("REDIS_URL", "localhost:6379"),
 		RedisPassword: os.Getenv("REDIS_PASSWORD"),
+		PostgresURL:   getEnvOrDefault("POSTGRES_URL", "postgres://postgres:postgres@localhost:5432/kraionyx?sslmode=disable"),
 		KafkaBrokers:  strings.Split(getEnvOrDefault("KAFKA_BROKERS", "localhost:9092"), ","),
 		EncryptionKey:    os.Getenv("ENCRYPTION_KEY"),
 		JWTSecret:        os.Getenv("JWT_SECRET"),

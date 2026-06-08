@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/contrib/otelfiber/v2"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
@@ -16,9 +17,12 @@ import (
 	"github.com/kraionyx/api-gateway/internal/kafka"
 	"github.com/kraionyx/api-gateway/internal/middleware"
 	"github.com/kraionyx/api-gateway/internal/session"
+	"github.com/kraionyx/shared/pkg/audit"
 	"github.com/kraionyx/shared/pkg/auth"
 	"github.com/kraionyx/shared/pkg/secrets"
 	"github.com/redis/go-redis/v9"
+	"database/sql"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -47,23 +51,6 @@ func main() {
 		}
 	}
 
-	app := fiber.New()
-	app.Use(otelfiber.Middleware())
-	app.Use(middleware.AuditMiddleware())
-	app.Use(middleware.RateLimitMiddleware())
-
-	app.Get("/health", handler.HealthCheck)
-	app.Get("/health/ready", handler.ReadyCheck)
-
-	oidcValidator, err := auth.NewOIDCValidator(ctx, cfg.KeycloakIssuer, cfg.KeycloakClientID)
-	if err != nil {
-		slog.Error("failed to init oidc validator", "error", err)
-		os.Exit(1)
-	}
-
-	// Protect WS routes
-	app.Use("/ws", middleware.AuthMiddleware(oidcValidator))
-
 	clientCert, err := tls.LoadX509KeyPair(cfg.ClientCertFile, cfg.ClientKeyFile)
 	if err != nil {
 		slog.Warn("could not load client certificates, mTLS might fail", "error", err)
@@ -81,6 +68,40 @@ func main() {
 		MinVersion:   tls.VersionTLS13,
 	}
 
+	producer, err := kafka.NewProducer(cfg.KafkaBrokers, tlsConfig, slog.Default())
+	if err != nil {
+		slog.Error("failed to create kafka producer", "error", err)
+	}
+
+	var auditLogger *audit.Logger
+	if producer != nil {
+		auditLogger = audit.NewLogger(producer.Client(), slog.Default(), "api-gateway")
+	} else {
+		auditLogger = audit.NewLogger(nil, slog.Default(), "api-gateway")
+	}
+
+	app := fiber.New()
+	
+	prom := fiberprometheus.New("api_gateway")
+	prom.RegisterAt(app, "/metrics")
+	app.Use(prom.Middleware)
+
+	app.Use(otelfiber.Middleware())
+	app.Use(middleware.AuditMiddleware(auditLogger))
+	app.Use(middleware.RateLimitMiddleware())
+
+	app.Get("/health", handler.HealthCheck)
+	app.Get("/health/ready", handler.ReadyCheck)
+
+	oidcValidator, err := auth.NewOIDCValidator(ctx, cfg.KeycloakIssuer, cfg.KeycloakClientID)
+	if err != nil {
+		slog.Error("failed to init oidc validator", "error", err)
+		os.Exit(1)
+	}
+
+	// Protect WS routes
+	app.Use("/ws", middleware.AuthMiddleware(oidcValidator))
+
 	rdb := redis.NewClient(&redis.Options{
 		Addr:      cfg.RedisURL,
 		Password:  cfg.RedisPassword,
@@ -88,10 +109,22 @@ func main() {
 	})
 	sessionMgr := session.NewManager(rdb, 24*time.Hour)
 
-	producer, err := kafka.NewProducer(cfg.KafkaBrokers, tlsConfig, slog.Default())
+	db, err := sql.Open("postgres", cfg.PostgresURL)
 	if err != nil {
-		slog.Error("failed to create kafka producer", "error", err)
+		slog.Error("failed to connect to postgres", "error", err)
+	} else if err = db.Ping(); err != nil {
+		slog.Error("failed to ping postgres", "error", err)
+	} else {
+		_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS patient_consents (
+			patient_id VARCHAR(255) PRIMARY KEY,
+			data_processing BOOLEAN NOT NULL DEFAULT false,
+			ai_training BOOLEAN NOT NULL DEFAULT false,
+			updated_at TIMESTAMP NOT NULL
+		)`)
 	}
+
+	consentHandler := handler.NewConsentHandler(db, auditLogger, slog.Default())
+	consentHandler.SetupRoutes(app)
 
 	wsHandler := handler.NewWebSocketHandler(sessionMgr, producer, []byte(cfg.EncryptionKey), slog.Default())
 

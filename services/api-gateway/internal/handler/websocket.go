@@ -11,6 +11,23 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/kraionyx/shared/pkg/crypto"
 	"github.com/kraionyx/shared/pkg/models"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+var (
+	wsActiveSessions = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "kraionyx_ws_active_sessions",
+		Help: "The total number of active WebSocket sessions",
+	})
+	wsEncryptionErrors = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "kraionyx_ws_encryption_errors_total",
+		Help: "The total number of encryption errors during audio processing",
+	})
+	wsChunksProcessed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "kraionyx_ws_chunks_processed_total",
+		Help: "The total number of audio chunks successfully processed",
+	})
 
 	"github.com/kraionyx/api-gateway/internal/kafka"
 	"github.com/kraionyx/api-gateway/internal/session"
@@ -69,6 +86,8 @@ type Client struct {
 
 	msgCount    int
 	lastMsgTime time.Time
+
+	currentEncryptionKey []byte
 }
 
 // NewWebSocketHandler creates a new WebSocket audio stream handler.
@@ -131,6 +150,7 @@ func (c *Client) readPump() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			_, closeErr := c.handler.sessionMgr.CloseSession(ctx, c.currentSessionID)
+			wsActiveSessions.Dec()
 			if closeErr != nil {
 				c.logger.Warn("failed to close session on disconnect",
 					slog.String("session_id", c.currentSessionID),
@@ -255,7 +275,11 @@ func (c *Client) handleTextMessage(msg []byte) {
 			return
 		}
 
+		c.currentEncryptionKey = make([]byte, len(c.handler.encryptionKey))
+		copy(c.currentEncryptionKey, c.handler.encryptionKey)
+
 		c.currentSessionID = sess.ID
+		wsActiveSessions.Inc()
 		c.logger.Info("session started", slog.String("session_id", sess.ID))
 
 		ack := ackMessage{
@@ -298,7 +322,9 @@ func (c *Client) handleTextMessage(msg []byte) {
 			Message:   "session stopped",
 		}
 		c.sendJSON(ack)
+		wsActiveSessions.Dec()
 		c.currentSessionID = ""
+		c.currentEncryptionKey = nil
 
 	default:
 		c.sendError("unknown action: " + ctrl.Action)
@@ -322,8 +348,28 @@ func (c *Client) handleBinaryMessage(audioData []byte) {
 	// Chunk index is 0-based for the message, Redis returns 1-based count.
 	msgChunkIndex := chunkIndex - 1
 
-	encryptedData, err := crypto.Encrypt(audioData, c.handler.encryptionKey)
+	if msgChunkIndex > 0 && msgChunkIndex%5000 == 0 {
+		newKey, err := crypto.GenerateKey()
+		if err == nil {
+			encryptedNewKey, err := crypto.Encrypt(newKey, c.handler.encryptionKey)
+			if err == nil {
+				c.currentEncryptionKey = newKey
+				c.sendJSON(map[string]interface{}{
+					"action": "rotate_key",
+					"key":    encryptedNewKey,
+				})
+				c.logger.Info("rotated encryption key", slog.String("session_id", c.currentSessionID))
+			} else {
+				c.logger.Error("failed to encrypt new rotated key", slog.String("error", err.Error()))
+			}
+		} else {
+			c.logger.Error("failed to generate new rotated key", slog.String("error", err.Error()))
+		}
+	}
+
+	encryptedData, err := crypto.Encrypt(audioData, c.currentEncryptionKey)
 	if err != nil {
+		wsEncryptionErrors.Inc()
 		c.logger.Error("failed to encrypt audio chunk",
 			slog.String("session_id", c.currentSessionID),
 			slog.String("error", err.Error()),
@@ -351,6 +397,8 @@ func (c *Client) handleBinaryMessage(audioData []byte) {
 		c.sendError("publish error")
 		return
 	}
+
+	wsChunksProcessed.Inc()
 
 	c.logger.Debug("audio chunk processed",
 		slog.String("session_id", c.currentSessionID),

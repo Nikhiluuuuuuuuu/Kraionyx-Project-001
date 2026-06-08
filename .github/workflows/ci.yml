@@ -49,7 +49,12 @@ jobs:
           go-version: '1.22'
 
       - name: Go Test
-        run: go test -v ./... || true
+        run: go test -v -race -cover ./...
+
+      - name: Fuzz Tests
+        run: |
+          cd services/api-gateway
+          go test -fuzz=Fuzz -fuzztime=10s ./...
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -59,7 +64,7 @@ jobs:
       - name: Python Test
         run: |
           pip install pytest
-          pytest || true
+          pytest
 
   security:
     name: Security Scans
@@ -81,7 +86,14 @@ jobs:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'table'
-          exit-code: '0'
+          exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: ./...
+        env:
+          GO111MODULE: on
