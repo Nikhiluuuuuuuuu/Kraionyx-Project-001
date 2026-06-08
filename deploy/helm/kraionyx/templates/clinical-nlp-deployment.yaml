@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-clinical-nlp
+  labels:
+    app.kubernetes.io/name: clinical-nlp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.clinicalNlp.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clinical-nlp
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: clinical-nlp
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: clinical-nlp
+          image: "{{ .Values.clinicalNlp.image.repository }}:{{ .Values.clinicalNlp.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.clinicalNlp.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.clinicalNlp.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.clinicalNlp.resources | nindent 12 }}
