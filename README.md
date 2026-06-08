@@ -9,7 +9,7 @@
 
 Kraionyx is a state-of-the-art, real-time clinical documentation system designed for modern healthcare environments. It captures doctor–patient conversations with high-fidelity, performs multi-speaker diarization, generates structured SOAP notes using specialized medical AI models, and pushes the final records seamlessly to Electronic Health Record (EHR) systems via the FHIR R4 standard. 
 
-Engineered for extreme reliability, the platform processes heavy workloads via a distributed microservices architecture while enforcing strict zero-retention policies.
+Engineered for extreme reliability, the platform targets Tier-1 Production standards, processing heavy workloads via a distributed microservices architecture. It features full CI/CD pipelines, Kubernetes Helm charts for scalable orchestration, enterprise-grade Keycloak RBAC, HashiCorp Vault for secrets management, and strict zero-trust mTLS enforcement across all internal communications, all while enforcing strict zero-retention policies.
 
 > ⚠️ **MISSION CRITICAL & PHI ALERT:** This software processes Protected Health Information (PHI). Production deployments are strictly governed by HIPAA (US), DPDPA (India), and other global privacy laws. Refer to the comprehensive [Security Documentation](docs/security.md) for enforcement guidelines.
 
@@ -25,26 +25,32 @@ graph TB
 
     subgraph "Frontend Network"
         GW["API Gateway<br/><i>Go · WebSocket · TLS 1.3</i>"]
+        KC["Keycloak<br/><i>IAM & RBAC</i>"]
     end
 
-    subgraph "Backend Network (Internal)"
+    subgraph "Backend Network (Internal / mTLS)"
         direction TB
-        KAFKA["Apache Kafka<br/><i>KRaft Mode</i>"]
-        REDIS["Redis 7<br/><i>Audio Buffer · Sessions</i>"]
+        KAFKA["Apache Kafka<br/><i>KRaft Mode (mTLS)</i>"]
+        REDIS["Redis 7<br/><i>Audio Buffer (mTLS)</i>"]
 
-        AP["Audio Processor<br/><i>Python · Pyannote (10s buffers)</i>"]
-        STT["STT Engine<br/><i>Python · Whisper Large-V3 (LoRA)</i>"]
-        NLP["Clinical NLP<br/><i>Llama-3.1/Sarvam-1 & BGE-m3</i>"]
-        FHIR["FHIR Adapter<br/><i>Go · FHIR R4 · DLQ</i>"]
+        AP["Audio Processor<br/><i>Python · Pyannote</i>"]
+        STT["STT Engine<br/><i>Whisper Large-V3</i>"]
+        NLP["Clinical NLP<br/><i>Llama-3.1 & BGE-m3</i>"]
+        FHIR["FHIR Adapter<br/><i>Go · FHIR R4</i>"]
+        
+        VAULT["HashiCorp Vault<br/><i>Secrets & PKI</i>"]
     end
 
     subgraph "External Systems"
         EHR["EHR / FHIR Server"]
     end
 
+    MIC -->|"Auth / JWT"| KC
     MIC -->|"WSS Binary Frames"| GW
-    GW -->|"audio.raw.chunks"| KAFKA
-    GW <-->|"Session State"| REDIS
+    GW -->|"Validates JWT"| KC
+    GW -->|"Fetches mTLS Certs"| VAULT
+    GW -->|"audio.raw.chunks (mTLS)"| KAFKA
+    GW <-->|"Session State (mTLS)"| REDIS
     KAFKA -->|"audio.raw.chunks"| AP
     AP -->|"audio.preprocessed"| KAFKA
     AP <-->|"Audio Buffer"| REDIS
@@ -56,12 +62,14 @@ graph TB
     FHIR -->|"FHIR R4 REST"| EHR
 
     style GW fill:#2563eb,color:#fff
+    style KC fill:#f59e0b,color:#fff
     style KAFKA fill:#e11d48,color:#fff
     style REDIS fill:#dc2626,color:#fff
     style AP fill:#7c3aed,color:#fff
     style STT fill:#7c3aed,color:#fff
     style NLP fill:#7c3aed,color:#fff
     style FHIR fill:#2563eb,color:#fff
+    style VAULT fill:#059669,color:#fff
     style EHR fill:#059669,color:#fff
 ```
 
@@ -89,6 +97,9 @@ graph TB
 | **NVIDIA Container Toolkit** | Latest | GPU passthrough to Docker |
 | **mkcert** | Latest | TLS certificate generation (dev) |
 | **protoc** | 3.x | Protobuf code generation |
+| **HashiCorp Vault** | 1.15+ | Secrets and dynamic certificate management |
+| **Keycloak** | 22+ | Identity, access management, and RBAC |
+| **Kubernetes / Helm** | 1.28+ | Production orchestration and deployment |
 
 ### GPU Requirements
 
