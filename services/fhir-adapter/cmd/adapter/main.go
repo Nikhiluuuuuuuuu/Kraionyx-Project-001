@@ -10,6 +10,7 @@ import (
 	"github.com/kraionyx/fhir-adapter/internal/config"
 	"github.com/kraionyx/fhir-adapter/internal/kafka"
 	"github.com/kraionyx/shared/pkg/secrets"
+	"github.com/kraionyx/shared/pkg/telemetry"
 )
 
 func main() {
@@ -21,6 +22,16 @@ func main() {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
 	}
+
+	tp, err := telemetry.InitTracer(ctx, "fhir-adapter", "otel-collector:4317")
+	if err != nil {
+		slog.Error("failed to init tracer", "error", err)
+	} else {
+		defer func() { _ = tp.Shutdown(ctx) }()
+	}
+	
+	// Start metrics server for Prometheus
+	telemetry.StartMetricsServer(":9090")
 
 	vaultClient, err := secrets.NewVaultClient(cfg.VaultAddress, cfg.VaultToken)
 	if err != nil {
