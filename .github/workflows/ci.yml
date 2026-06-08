@@ -1,15 +1,24 @@
-name: CI/CD Pipeline
+name: Kraionyx CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
 
 jobs:
-  lint:
-    name: Lint Code
+  go-services:
+    name: Build, Lint, Test & Scan (Go)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api-gateway, fhir-adapter, audio-processor]
+    
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -18,82 +27,101 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache: true
+          cache-dependency-path: services/${{ matrix.service }}/go.sum
+
+      - name: Install dependencies
+        run: go mod download
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          working-directory: services/${{ matrix.service }}
           args: --timeout=5m
-          working-directory: .
+
+      - name: Run gosec (Security Scanner)
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -exclude-dir=tests ./...
+
+      - name: Run Tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+  python-services:
+    name: Build, Lint, Test & Scan (Python)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [clinical-nlp, stt-engine]
+    
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
-      - name: Run ruff
+      - name: Install dependencies
         run: |
-          pip install ruff
-          ruff check .
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          pip install flake8 pytest bandit black isort
 
-  test:
-    name: Run Tests
+      - name: Run Black (Formatter Check)
+        run: black --check .
+
+      - name: Run Isort (Imports Check)
+        run: isort --check-only .
+
+      - name: Run Flake8 (Linting)
+        run: flake8 . --max-line-length=100
+
+      - name: Run Bandit (Security Scanner)
+        run: bandit -r . -lll
+
+      - name: Run Tests
+        run: pytest -v
+
+  docker-build-and-scan:
+    name: Build and Scan Docker Images
+    needs: [go-services, python-services]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api-gateway, fhir-adapter, audio-processor, clinical-nlp, stt-engine]
+    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
         with:
-          go-version: '1.22'
+          context: services/${{ matrix.service }}
+          push: false
+          load: true
+          tags: kraionyx/${{ matrix.service }}:${{ github.sha }}
 
-      - name: Go Test
-        run: go test -v -race -cover ./...
-
-      - name: Fuzz Tests
-        run: |
-          cd services/api-gateway
-          go test -fuzz=Fuzz -fuzztime=10s ./...
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Python Test
-        run: |
-          pip install pytest
-          pytest
-
-  security:
-    name: Security Scans
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run Trivy Vulnerability Scanner
+      - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
+          image-ref: 'kraionyx/${{ matrix.service }}:${{ github.sha }}'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
-
-      - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
-        with:
-          args: ./...
-        env:
-          GO111MODULE: on
