@@ -116,12 +116,12 @@ test-go: ## Run Go tests for all Go services
 
 .PHONY: test-python
 test-python: ## Run pytest for all Python services
-	@for svc in $(PYTHON_SERVICES); do \
+	@for svc in audio-processor stt-engine clinical-nlp; do \
 		echo "=== Testing $$svc ==="; \
-		if [ -d "$$svc" ]; then \
-			cd $$svc && python -m pytest -v --tb=short tests/ && cd - > /dev/null; \
+		if [ -d "tests/$$svc" ]; then \
+			PYTHONPATH=services/$$svc/src python -m pytest -v --tb=short tests/$$svc/; \
 		else \
-			echo "  [SKIP] $$svc not found"; \
+			echo "  [SKIP] tests/$$svc not found"; \
 		fi; \
 	done
 

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-audio-processor
+  labels:
+    app.kubernetes.io/name: audio-processor
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.audioProcessor.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: audio-processor
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: audio-processor
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: audio-processor
+          image: "{{ .Values.audioProcessor.image.repository }}:{{ .Values.audioProcessor.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.audioProcessor.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.audioProcessor.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.audioProcessor.resources | nindent 12 }}

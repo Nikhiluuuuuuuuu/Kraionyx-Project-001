@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-stt-engine
+  labels:
+    app.kubernetes.io/name: stt-engine
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.sttEngine.service.type }}
+  ports:
+    - port: {{ .Values.sttEngine.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: stt-engine
+    app.kubernetes.io/instance: {{ .Release.Name }}

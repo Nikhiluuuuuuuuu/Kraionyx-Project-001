@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kraionyx.fullname" . }}-fhir-adapter
+  labels:
+    app.kubernetes.io/name: fhir-adapter
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.fhirAdapter.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fhir-adapter
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fhir-adapter
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: fhir-adapter
+          image: "{{ .Values.fhirAdapter.image.repository }}:{{ .Values.fhirAdapter.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.fhirAdapter.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.fhirAdapter.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.fhirAdapter.resources | nindent 12 }}
