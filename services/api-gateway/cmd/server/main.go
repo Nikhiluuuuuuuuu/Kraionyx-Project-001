@@ -20,6 +20,7 @@ import (
 	"github.com/kraionyx/shared/pkg/audit"
 	"github.com/kraionyx/shared/pkg/auth"
 	"github.com/kraionyx/shared/pkg/secrets"
+	"github.com/kraionyx/shared/pkg/telemetry"
 	"github.com/redis/go-redis/v9"
 	"database/sql"
 	_ "github.com/lib/pq"
@@ -31,6 +32,13 @@ func main() {
 	if err != nil {
 		slog.Error("failed to load config", "error", err)
 		os.Exit(1)
+	}
+
+	tp, err := telemetry.InitTracer(ctx, "api-gateway", "otel-collector:4317")
+	if err != nil {
+		slog.Error("failed to init tracer", "error", err)
+	} else {
+		defer func() { _ = tp.Shutdown(ctx) }()
 	}
 
 	vaultClient, err := secrets.NewVaultClient(cfg.VaultAddress, cfg.VaultToken)
