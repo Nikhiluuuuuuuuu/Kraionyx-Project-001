@@ -5,7 +5,7 @@ package kafka
 
 import (
 	"context"
-
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -32,19 +32,23 @@ type Producer struct {
 
 // NewProducer creates a new Kafka producer connected to the given broker addresses.
 // It configures LZ4 compression, idempotent production, and async error logging.
-func NewProducer(brokers []string, logger *slog.Logger) (*Producer, error) {
+func NewProducer(brokers []string, tlsConfig *tls.Config, logger *slog.Logger) (*Producer, error) {
 	if len(brokers) == 0 {
 		return nil, fmt.Errorf("kafka: at least one broker address is required")
 	}
 
-
-	client, err := kgo.NewClient(
+	opts := []kgo.Opt{
 		kgo.SeedBrokers(brokers...),
-		kgo.DialTLS(),
 		kgo.ProducerLinger(0),
 		kgo.ProducerBatchCompression(kgo.Lz4Compression()),
 		kgo.AllowAutoTopicCreation(),
-	)
+	}
+
+	if tlsConfig != nil {
+		opts = append(opts, kgo.DialTLSConfig(tlsConfig))
+	}
+
+	client, err := kgo.NewClient(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("kafka: failed to create producer: %w", err)
 	}

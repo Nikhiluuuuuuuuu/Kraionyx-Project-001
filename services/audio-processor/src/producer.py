@@ -56,6 +56,14 @@ class AudioProducer:
             "compression.type": "lz4",
             "message.max.bytes": "10485760",  # 10 MiB
         }
+        if config.kafka_security_protocol == "SSL":
+            kafka_conf.update({
+                "security.protocol": "SSL",
+                "ssl.ca.location": config.kafka_ssl_cafile,
+                "ssl.certificate.location": config.kafka_ssl_certfile,
+                "ssl.key.location": config.kafka_ssl_keyfile,
+            })
+            
         self._producer = Producer(kafka_conf)
         self._error_topic = config.kafka_error_topic
         logger.info("AudioProducer created: brokers=%s", config.kafka_brokers)

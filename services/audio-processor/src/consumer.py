@@ -39,6 +39,14 @@ class AudioConsumer:
             "session.timeout.ms": "45000",
             "heartbeat.interval.ms": "15000",
         }
+        if config.kafka_security_protocol == "SSL":
+            kafka_conf.update({
+                "security.protocol": "SSL",
+                "ssl.ca.location": config.kafka_ssl_cafile,
+                "ssl.certificate.location": config.kafka_ssl_certfile,
+                "ssl.key.location": config.kafka_ssl_keyfile,
+            })
+        
         self._consumer = Consumer(kafka_conf)
         self._topic = config.kafka_input_topic
         self._running = True

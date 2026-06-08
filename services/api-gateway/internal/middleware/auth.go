@@ -4,10 +4,10 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v5"
+	sharedAuth "github.com/kraionyx/shared/pkg/auth"
 )
 
-func AuthMiddleware(jwtSecret string) fiber.Handler {
+func AuthMiddleware(validator *sharedAuth.OIDCValidator) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
@@ -20,21 +20,13 @@ func AuthMiddleware(jwtSecret string) fiber.Handler {
 		}
 
 		tokenString := parts[1]
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fiber.ErrUnauthorized
-			}
-			return []byte(jwtSecret), nil
-		})
-
-		if err != nil || !token.Valid {
+		
+		token, err := validator.ValidateToken(c.Context(), tokenString)
+		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
 		}
 
-		// Store claims in context if needed
-		if claims, ok := token.Claims.(jwt.MapClaims); ok {
-			c.Locals("user_id", claims["sub"])
-		}
+		c.Locals("user_id", token.Subject)
 
 		return c.Next()
 	}

@@ -20,6 +20,9 @@ from typing import Any
 
 import numpy as np
 
+import redis
+from prometheus_client import start_http_server, Counter, Histogram
+
 from kraionyx_common.crypto import AES256GCM
 from kraionyx_common.models import AudioChunkMessage, PipelineError
 
@@ -30,6 +33,11 @@ from .noise_reduction import NoiseReducer
 from .producer import AudioProducer
 
 logger = logging.getLogger(__name__)
+
+# Prometheus metrics
+MESSAGES_PROCESSED = Counter("messages_processed_total", "Total messages processed")
+PROCESSING_TIME = Histogram("processing_time_seconds", "Time spent processing a chunk")
+PROCESSING_ERRORS = Counter("processing_errors_total", "Total processing errors")
 
 
 def setup_logging(level: str) -> None:
@@ -85,6 +93,27 @@ def main() -> None:
     setup_logging(config.log_level)
 
     logger.info("=== Audio Processor starting ===")
+    
+    # Start Prometheus server
+    start_http_server(config.prometheus_port)
+    logger.info(f"Prometheus metrics exposed on port {config.prometheus_port}")
+
+    # Initialise Redis with mTLS support
+    redis_kwargs = {}
+    if config.redis_ssl:
+        redis_kwargs.update({
+            "ssl": True,
+            "ssl_cert_reqs": "required",
+            "ssl_ca_certs": config.redis_ssl_ca_certs,
+            "ssl_certfile": config.redis_ssl_certfile,
+            "ssl_keyfile": config.redis_ssl_keyfile,
+        })
+    redis_client = redis.Redis.from_url(config.redis_url, password=config.redis_password, **redis_kwargs)
+    try:
+        redis_client.ping()
+        logger.info("Connected to Redis successfully.")
+    except Exception as e:
+        logger.warning(f"Failed to connect to Redis: {e}")
 
     # Initialise components
     noise_reducer = NoiseReducer(config.sample_rate, config.device)
@@ -113,6 +142,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     session_buffers: dict[str, list[np.ndarray]] = {}
 
+    @PROCESSING_TIME.time()
     def handle_message(msg: AudioChunkMessage) -> None:
         """Process a single audio chunk through the pipeline.
 
@@ -195,6 +225,7 @@ def main() -> None:
                 message=result,
             )
 
+            MESSAGES_PROCESSED.inc()
             elapsed = time.monotonic() - t0
             logger.info(
                 "Window processed: session_id=%s chunk_index=%d "
@@ -206,6 +237,7 @@ def main() -> None:
             )
 
         except Exception as exc:
+            PROCESSING_ERRORS.inc()
             elapsed = time.monotonic() - t0
             logger.exception(
                 "Failed to process chunk: session_id=%s chunk_index=%d "
