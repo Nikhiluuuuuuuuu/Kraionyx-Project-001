@@ -97,7 +97,7 @@ func (s *Service) Revoke(ctx context.Context, consentID string) error {
 }
 
 // CheckAccess verifies if a patient has granted active consent for a specific app and type.
-func (s *Service) CheckAccess(ctx context.Context, patientID, appID string, cType ConsentType) (bool, error) {
+func (s *Service) CheckConsent(ctx context.Context, patientID, appID string, cType ConsentType) (bool, error) {
 	records, err := s.store.ListActiveConsents(ctx, patientID)
 	if err != nil {
 		return false, err
