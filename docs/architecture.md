@@ -15,8 +15,8 @@ C4Context
         SystemDb(kafka, "Apache Kafka", "KRaft Mode", "Event backbone for asynchronous processing")
         SystemDb(redis, "Redis", "Redis Streams", "Low-latency audio chunk buffering")
         System(audio_proc, "Audio Processor", "Python, Pyannote", "500ms chunks -> 10s windows, O(1) hash map speaker roles")
-        System(stt, "STT Engine", "Python, Whisper Large-V3", "High-performance transcription via LoRA + Indic Support")
-        System(nlp, "Clinical NLP", "Python, Llama-3.1/Sarvam-1", "Extractor, Synthesizer, Verifier agents + BGE-m3 LRU Eviction")
+        System(stt, "STT Engine", "Python, Sarvam AI STT", "API integration for high-performance transcription")
+        System(nlp, "Clinical NLP", "Python, Sarvam AI Gen", "API integration for structured SOAP notes")
         System(fhir, "FHIR Adapter", "Go", "Formats and pushes records to EHR with Exp Backoff & DLQ")
         
         System(vault, "HashiCorp Vault", "Go", "Secrets management and dynamic mTLS PKI")
@@ -62,8 +62,8 @@ Use **Go** for network-bound services and **Python** for ML/AI services.
 | API Gateway | Go | Low-latency WebSocket handling, efficient goroutine concurrency |
 | FHIR Adapter | Go | Strong HTTP client, type safety for FHIR resource construction |
 | Audio Processor | Python | Pyannote (10s buffers, O(1) role map) |
-| STT Engine | Python | OpenAI Whisper Large-V3 (LoRA) + IndicTrans2/IndicXlit |
-| Clinical NLP | Python | Multi-Agent Workflow (Llama-3.1-8B-Instruct/Sarvam-1) + BGE-m3 LRU |
+| STT Engine | Python | Sarvam AI STT API Integration |
+| Clinical NLP | Python | Sarvam AI Text Generation API Integration |
 
 ### Consequences
 
@@ -172,57 +172,54 @@ Use **Redis Streams** as the audio chunk buffer, with Kafka for inter-service ev
 
 ---
 
-## ADR-005: OpenAI Whisper Large-V3 (LoRA) Over NVIDIA Canary-Qwen
+## ADR-005: Migration to Sarvam AI STT API
 
 **Status:** Accepted
 **Date:** 2026-06
 
 ### Context
 
-Originally, the STT Engine utilized NVIDIA Canary-Qwen. However, to support better multi-lingual processing and achieve state-of-the-art medical accuracy, an upgrade to Whisper Large-V3 with LoRA, alongside Indic language support (IndicTrans2/IndicXlit), was necessary.
+Originally, the STT Engine utilized OpenAI Whisper Large-V3. To optimize infrastructure costs (removing GPU dependencies entirely) and leverage highly specialized Indic models, we migrated to the Sarvam AI STT API.
 
 ### Decision
 
-Use **OpenAI Whisper Large-V3** with **LoRA support** for the STT Engine, alongside **IndicTrans2 and IndicXlit** for Indic language handling.
+Use **Sarvam AI STT API** for the STT Engine. PII redaction executes prior to any payload leaving our infrastructure.
 
 ### Rationale
 
-- **Accuracy**: Whisper Large-V3 provides state-of-the-art performance across multiple languages. LoRA enables fine-tuning specifically for medical terminology.
-- **Indic Support**: Integrating IndicTrans2 and IndicXlit natively supports India's linguistic diversity.
-- **Robustness**: Better native handling of specialized medical terminology and regional accents.
+- **Infrastructure:** Removes heavy GPU infrastructure costs, allowing for CPU-bound microservices only.
+- **Indic Support:** Sarvam provides state-of-the-art Indic language processing out of the box.
+- **Security:** We enforce zero-trust by redacting PHI locally before hitting external endpoints.
 
 ### Consequences
 
-- **Positive**: Higher transcription accuracy, robust multi-lingual and Indic support, easier fine-tuning via LoRA.
-- **Negative**: Increased VRAM requirements (~12 GB), necessitating larger hardware profiles.
+- **Positive:** CPU-only deployment, drastically reduced hosting cost, superior Indic accuracy.
+- **Negative:** Requires an active internet connection; introduces dependency on a third-party API.
 
 ---
 
-## ADR-006: Agentic Workflow (Llama-3.1/Sarvam-1) & BGE-m3 RAG Over Basic RAG
+## ADR-006: Migration to Sarvam AI Text Generation API
 
 **Status:** Accepted
 **Date:** 2026-06
 
 ### Context
 
-Generating SOAP notes in a single LLM pass (previously MedGemma) led to hallucinations. The initial Multi-Agent workflow using FAISS needed an upgrade to better models and more resilient caching for patient history context.
+Local LLMs (like Llama-3.1-8B-Instruct) required significant VRAM. To further our CPU-only infrastructure goals while maintaining high reasoning capabilities for SOAP note generation, we integrated Sarvam AI APIs.
 
 ### Decision
 
-Implement an **Agentic Workflow** using **Llama-3.1-8B-Instruct and Sarvam-1**, while upgrading the Vector DB to use **BGE-m3 embeddings with an LRU cache eviction policy**.
+Implement an **Agentic Workflow** using **Sarvam AI Text Generation API**.
 
 ### Rationale
 
-- **Multi-Agent Pipeline**: Uses top-tier 8B instruct models tailored for reasoning and Indic context.
-  - *Extractor*: Extracts entities using Presidio for PHI and LLM for symptoms/vitals.
-  - *Synthesizer*: Drafts the SOAP note incorporating RAG data.
-  - *Verifier*: Cross-checks the draft against the original transcript.
-- **BGE-m3 RAG + LRU**: Upgraded vector embeddings for better semantic retrieval across multiple languages, coupled with an LRU cache eviction policy for efficient memory management.
+- **Cloud-based Inference:** Lowers local hardware requirements to standard multi-core CPUs.
+- **Compliance:** `pii_redactor.py` executes before any prompt is sent to the Sarvam API, ensuring PHI safety.
 
 ### Consequences
 
-- **Positive**: Drastic reduction in hallucinations, high clinical safety, multi-lingual RAG support.
-- **Negative**: Increased VRAM requirements (~24 GB) for holding Llama-3.1-8B-Instruct in memory alongside BGE-m3.
+- **Positive:** Drastic reduction in local hardware footprint (no VRAM required), high clinical safety via pre-redaction.
+- **Negative:** Adds network latency for prompt completion.
 
 ---
 
@@ -454,3 +451,29 @@ Adopt **HashiCorp Vault** for centralized secrets management and PKI for dynamic
 
 - **Positive**: Simplifies compliance audits, automates key rotation, ensures secrets are injected only at runtime.
 - **Negative**: Introduces a critical dependency; if Vault goes down, services cannot boot or rotate keys.
+
+---
+
+## ADR-016: Multi-Tenant Architecture (Tier 2 Schema Isolation)
+
+**Status:** Accepted
+**Date:** 2026-06
+
+### Context
+
+To support multiple hospital networks in a single SaaS deployment securely and efficiently, we need strong tenant isolation.
+
+### Decision
+
+Implement **Tier 2 Schema Isolation**. The API Gateway extracts `tenant_id` from JWTs. Database connections dynamically set `search_path` to `tenant_<tenant_id>`. Audit logging is also enhanced to require `tenant_id` alongside `user_id`.
+
+### Rationale
+
+- **Logical Isolation:** Provides strong logical data isolation between tenants while sharing common infrastructure (DB instances, message queues).
+- **Security:** Ensures queries cannot accidentally leak data across tenants.
+- **Compliance:** Audit logs are strictly tied to a tenant and user context.
+
+### Consequences
+
+- **Positive:** Cost-effective multi-tenancy, excellent data isolation.
+- **Negative:** Requires careful handling of connection pooling and `search_path` resets to avoid cross-tenant poisoning.
