@@ -1,5 +1,5 @@
 # ============================================================================
-# Svaani Project - .gitignore
+# Kraionyx Project - .gitignore
 # Go + Python + Docker monorepo for HIPAA-compliant medical STT & EHR system
 # ============================================================================
 
@@ -117,6 +117,7 @@ gen/
 logs/
 tmp/
 temp/
+services/*/results/
 
 # ---- Terraform / IaC (future) ----
 *.tfstate
