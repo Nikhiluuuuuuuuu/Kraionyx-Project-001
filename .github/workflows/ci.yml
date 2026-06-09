@@ -90,6 +90,8 @@ jobs:
         run: bandit -r . -lll
 
       - name: Run Tests
+        env:
+          SARVAM_API_KEY: dummy_key_for_ci
         run: pytest -v --cov=. --cov-fail-under=70
 
   docker-build-and-scan:

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -8,6 +9,9 @@ import (
 )
 
 func RateLimitMiddleware(store fiber.Storage) fiber.Handler {
+	if store == nil {
+		log.Fatal("FATAL: Redis rate limiter storage is nil. Refusing to start in-memory fallback in production.")
+	}
 	return limiter.New(limiter.Config{
 		Max:        100,             // max 100 requests
 		Expiration: 1 * time.Minute, // per minute

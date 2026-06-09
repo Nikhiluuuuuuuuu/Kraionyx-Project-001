@@ -11,6 +11,8 @@ class LLMBackend:
         self.model_name = model_name
         self.api_url = os.getenv("LLM_API_URL", "https://api.sarvam.ai/text-generate")
         self.api_key = os.getenv("SARVAM_API_KEY", "")
+        if not self.api_key:
+            raise ValueError("SARVAM_API_KEY is not set")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def generate(self, prompt: str) -> str:

@@ -26,13 +26,12 @@ def test_clinical_producer_produce(mock_kafka, mock_config):
     producer.producer.produce.assert_called_once()
 
 @patch("src.llm.LLMBackend.generate")
-def test_clinical_workflow(mock_generate):
+def test_clinical_workflow(mock_generate, workflow):
     mock_generate.side_effect = [
         '{"symptoms": ["headache"]}', # Extract
         '{"subjective": "Headache", "objective": "Normal", "assessment": "Migraine", "plan": "Rest"}', # Synthesize
         '{"status": "APPROVED"}' # Verify
     ]
-    workflow = ClinicalWorkflow()
     result = workflow.process_transcript("patient_1", "Doctor: how are you? Patient: I am fine.")
     assert result["status"] == "APPROVED"
     assert "soap_note" in result
