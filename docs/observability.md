@@ -18,15 +18,17 @@ All microservices (Go and Python) are instrumented with OpenTelemetry SDKs. Trac
 - **Go Services** (`api-gateway`, `fhir-adapter`): Use `go.opentelemetry.io/otel`.
 - **Python Services** (`audio-processor`, `stt-engine`, `clinical-nlp`): Use `opentelemetry-api` and `opentelemetry-sdk`.
 
+**Note:** Distributed traces now include `tenant_id` to provide tenant-specific performance isolation and monitoring.
+
 ## Metrics & Dashboards
 
 Prometheus scrapes metrics from the OTel Collector and individual services. Pre-configured Grafana dashboards are provided to monitor:
 
 - **API Gateway**: WebSocket connection counts, ingestion latency, and message drop rates.
 - **Kafka**: Topic lag, throughput, and error rates.
-- **STT Engine**: Inference latency (WER is tracked separately via benchmarking tools).
-- **Clinical NLP**: Model response times and cache hit/miss rates.
-- **Hardware Metrics**: GPU VRAM utilization, CPU/Memory per pod.
+- **STT Engine**: External API request latency, retry rates.
+- **Clinical NLP**: External API response times and BGE-m3 cache hit/miss rates.
+- **Hardware Metrics**: CPU/Memory utilization per pod (GPU monitoring removed as platform is now CPU-bound).
 
 ## Deployment Steps
 
