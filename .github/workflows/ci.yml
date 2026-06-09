@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api-gateway, fhir-adapter, audio-processor]
+        service: [api-gateway, fhir-adapter]
     
     defaults:
       run:
@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [clinical-nlp, stt-engine]
+        service: [clinical-nlp, stt-engine, audio-processor]
     
     defaults:
       run:

@@ -1,0 +1,42 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure Kubernetes Credentials
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBECONFIG_STAGING }}
+          
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.0
+
+      - name: Deploy API Gateway
+        run: helm upgrade --install api-gateway deploy/helm/api-gateway -n staging --set image.tag=${{ github.sha }}
+
+      - name: Deploy Audio Processor
+        run: helm upgrade --install audio-processor deploy/helm/audio-processor -n staging --set image.tag=${{ github.sha }}
+
+      - name: Deploy Clinical NLP
+        run: helm upgrade --install clinical-nlp deploy/helm/clinical-nlp -n staging --set image.tag=${{ github.sha }}
+
+      - name: Deploy STT Engine
+        run: helm upgrade --install stt-engine deploy/helm/stt-engine -n staging --set image.tag=${{ github.sha }}
+
+      - name: Deploy FHIR Adapter
+        run: helm upgrade --install fhir-adapter deploy/helm/fhir-adapter -n staging --set image.tag=${{ github.sha }}
