@@ -75,7 +75,7 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install flake8 pytest bandit black isort
+          pip install flake8 pytest pytest-cov bandit black isort
 
       - name: Run Black (Formatter Check)
         run: black --check .
@@ -90,7 +90,7 @@ jobs:
         run: bandit -r . -lll
 
       - name: Run Tests
-        run: pytest -v
+        run: pytest -v --cov=. --cov-fail-under=70
 
   docker-build-and-scan:
     name: Build and Scan Docker Images
