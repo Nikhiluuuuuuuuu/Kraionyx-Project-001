@@ -1,4 +1,4 @@
-# Kraionyx Platform
+# Svaani Platform
 
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-blue.svg)](LICENSE)
 [![Compliance: HIPAA](https://img.shields.io/badge/Compliance-HIPAA-green.svg)](docs/security.md)
@@ -7,11 +7,23 @@
 
 **Enterprise-Grade, HIPAA-Compliant Medical Speech-to-Text & EHR Integration Platform**
 
-Kraionyx is a state-of-the-art, real-time clinical documentation system designed for modern healthcare environments. It captures doctor–patient conversations with high-fidelity, performs multi-speaker diarization, generates structured SOAP notes using specialized medical AI models, and pushes the final records seamlessly to Electronic Health Record (EHR) systems via the FHIR R4 standard. 
+Svaani is a state-of-the-art, real-time clinical documentation system designed for modern healthcare environments. It captures doctor–patient conversations with high-fidelity, performs multi-speaker diarization, generates structured SOAP notes using specialized medical AI models, and pushes the final records seamlessly to Electronic Health Record (EHR) systems via the FHIR R4 standard. 
 
-Engineered for extreme reliability, the platform processes heavy workloads via a distributed microservices architecture while enforcing strict zero-retention policies.
+Engineered for extreme reliability, the platform targets Tier-1 Production standards, processing heavy workloads via a distributed microservices architecture. It features full CI/CD pipelines with comprehensive security scanning, Kubernetes Helm charts for scalable orchestration, enterprise-grade Keycloak RBAC, HashiCorp Vault for secrets management, and strict zero-trust mTLS enforcement across all internal communications, all while enforcing strict zero-retention policies.
 
 > ⚠️ **MISSION CRITICAL & PHI ALERT:** This software processes Protected Health Information (PHI). Production deployments are strictly governed by HIPAA (US), DPDPA (India), and other global privacy laws. Refer to the comprehensive [Security Documentation](docs/security.md) for enforcement guidelines.
+
+---
+
+## Enterprise Production Capabilities
+
+The platform has been upgraded to a 10/10 Tier-1 production level with the following architectural enhancements:
+
+- **Advanced Observability**: Full OpenTelemetry distributed tracing and a Prometheus/Grafana stack located in `deploy/observability`. Enterprise structured JSON logging via `structlog` is enabled across all Python microservices.
+- **Kubernetes Orchestration**: Production-ready Helm charts (`deploy/helm/`) featuring Istio mTLS and dynamic HashiCorp Vault sidecar injection.
+- **Robust CI/CD & Security**: Automated GitHub Actions pipelines incorporating Trivy and gosec security scanning, alongside a strict 70% test coverage gate.
+- **Medical AI Benchmarking**: Comprehensive validation suites for WER (Word Error Rate) and Clinical Entity Evaluation integrated within `services/clinical-nlp` and `services/stt-engine`.
+- **Compliance & Privacy**: Dedicated Patient Consent Module (`shared/go/pkg/consent`) and automated Vault key rotation scripts for strict lifecycle management.
 
 ---
 
@@ -25,26 +37,32 @@ graph TB
 
     subgraph "Frontend Network"
         GW["API Gateway<br/><i>Go · WebSocket · TLS 1.3</i>"]
+        KC["Keycloak<br/><i>IAM & RBAC</i>"]
     end
 
-    subgraph "Backend Network (Internal)"
+    subgraph "Backend Network (Internal / mTLS)"
         direction TB
-        KAFKA["Apache Kafka<br/><i>KRaft Mode</i>"]
-        REDIS["Redis 7<br/><i>Audio Buffer · Sessions</i>"]
+        KAFKA["Apache Kafka<br/><i>KRaft Mode (mTLS)</i>"]
+        REDIS["Redis 7<br/><i>Audio Buffer (mTLS)</i>"]
 
-        AP["Audio Processor<br/><i>Python · Pyannote (10s buffers)</i>"]
-        STT["STT Engine<br/><i>Python · Whisper Large-V3 (LoRA)</i>"]
-        NLP["Clinical NLP<br/><i>Llama-3.1/Sarvam-1 & BGE-m3</i>"]
-        FHIR["FHIR Adapter<br/><i>Go · FHIR R4 · DLQ</i>"]
+        AP["Audio Processor<br/><i>Python · Pyannote</i>"]
+        STT["STT Engine<br/><i>Whisper Large-V3</i>"]
+        NLP["Clinical NLP<br/><i>Sarvam API & ChromaDB</i>"]
+        FHIR["FHIR Adapter<br/><i>Go · FHIR R4</i>"]
+        
+        VAULT["HashiCorp Vault<br/><i>Secrets & PKI</i>"]
     end
 
     subgraph "External Systems"
         EHR["EHR / FHIR Server"]
     end
 
+    MIC -->|"Auth / JWT"| KC
     MIC -->|"WSS Binary Frames"| GW
-    GW -->|"audio.raw.chunks"| KAFKA
-    GW <-->|"Session State"| REDIS
+    GW -->|"Validates JWT"| KC
+    GW -->|"Fetches mTLS Certs"| VAULT
+    GW -->|"audio.raw.chunks (mTLS)"| KAFKA
+    GW <-->|"Session State (mTLS)"| REDIS
     KAFKA -->|"audio.raw.chunks"| AP
     AP -->|"audio.preprocessed"| KAFKA
     AP <-->|"Audio Buffer"| REDIS
@@ -56,12 +74,14 @@ graph TB
     FHIR -->|"FHIR R4 REST"| EHR
 
     style GW fill:#2563eb,color:#fff
+    style KC fill:#f59e0b,color:#fff
     style KAFKA fill:#e11d48,color:#fff
     style REDIS fill:#dc2626,color:#fff
     style AP fill:#7c3aed,color:#fff
     style STT fill:#7c3aed,color:#fff
     style NLP fill:#7c3aed,color:#fff
     style FHIR fill:#2563eb,color:#fff
+    style VAULT fill:#059669,color:#fff
     style EHR fill:#059669,color:#fff
 ```
 
@@ -69,10 +89,10 @@ graph TB
 
 | Stage | Kafka Topic | Service | Technology |
 |-------|-------------|---------|------------|
-| 1. Ingest | `audio.raw.chunks` | API Gateway | Go, WebSocket, TLS 1.3, 100 msg/sec limit |
+| 1. Ingest | `audio.raw.chunks` | API Gateway | Go, WebSocket, TLS 1.3, Global Redis rate limiting (100 msg/sec) |
 | 2. Preprocess | `audio.preprocessed` | Audio Processor | Python, pyannote (500ms chunks to 10s windows, O(1) role hash map) |
 | 3. Transcribe | `transcription.results` | STT Engine | Python, OpenAI Whisper Large-V3 w/ LoRA (IndicTrans2/IndicXlit) |
-| 4. Generate Notes | `clinical.notes.created` | Clinical NLP | Python, Multi-Agent (Llama-3.1-8B-Instruct/Sarvam-1), BGE-m3 + LRU Eviction |
+| 4. Generate Notes | `clinical.notes.created` | Clinical NLP | Python, Multi-Agent (Sarvam API with Tenacity retries), ChromaDB (BGE-m3 with `CHROMA_PERSIST_DIR` for PersistentVolumes) |
 | 5. Push to EHR | `fhir.outbound` | FHIR Adapter | Go, FHIR R4, Exp Backoff & DLQ |
 
 ---
@@ -89,6 +109,9 @@ graph TB
 | **NVIDIA Container Toolkit** | Latest | GPU passthrough to Docker |
 | **mkcert** | Latest | TLS certificate generation (dev) |
 | **protoc** | 3.x | Protobuf code generation |
+| **HashiCorp Vault** | 1.15+ | Secrets and dynamic certificate management |
+| **Keycloak** | 22+ | Identity, access management, and RBAC |
+| **Kubernetes / Helm** | 1.28+ | Production orchestration and deployment |
 
 ### GPU Requirements
 
@@ -96,10 +119,10 @@ graph TB
 |---------|--------------|-------|
 | Audio Processor (pyannote) | ~2 GB | Speaker diarization |
 | STT Engine (Whisper Large-V3 + LoRA) | ~12 GB | Speech recognition (Indic Support) |
-| Clinical NLP (Llama-3.1-8B-Instruct/Sarvam-1) | ~24 GB | SOAP note generation via RAG (BGE-m3) |
+| Clinical NLP (ChromaDB + BGE-m3) | ~4 GB | RAG retrieval embeddings (LLM handled via API) |
 
-> **Minimum**: NVIDIA GPU with 24 GB VRAM (e.g., RTX 3090, RTX 4090)
-> **Recommended**: 48 GB VRAM (e.g., 2x RTX 4090, A6000, A40) for running all services concurrently.
+> **Minimum**: NVIDIA GPU with 16 GB VRAM
+> **Recommended**: 24 GB VRAM (e.g., RTX 3090, RTX 4090) for running all local services concurrently.
 
 ---
 
@@ -107,8 +130,8 @@ graph TB
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/kraionyx/kraionyx.git
-cd kraionyx
+git clone https://github.com/svaani/svaani.git
+cd svaani
 
 # 2. Configure environment
 cp .env.example .env
@@ -142,30 +165,37 @@ redis-cli -a "${REDIS_PASSWORD}" ping
 ## Project Structure
 
 ```
-kraionyx/
+svaani/
+├── .github/                        # GitHub Actions CI/CD & Security Scanning
 ├── certs/                          # TLS certificates (gitignored except .gitkeep)
 ├── deploy/
 │   ├── docker-compose.yml          # Full development stack
-│   └── docker-compose.infra.yml    # Infrastructure only (Kafka, Redis)
+│   ├── docker-compose.infra.yml    # Infrastructure only (Kafka, Redis)
+│   ├── helm/                       # Kubernetes Helm charts (Istio + Vault injection)
+│   └── observability/              # OpenTelemetry, Prometheus, and Grafana stack
 ├── docs/
 │   ├── architecture.md             # Architecture decision records
 │   ├── security.md                 # Security & compliance documentation
-│   └── api.md                      # API reference
+│   ├── api.md                      # API reference
+│   ├── kubernetes.md               # Kubernetes deployment & Helm guide
+│   └── observability.md            # Distributed tracing & metrics guide
 ├── proto/
-│   └── kraionyx/v1/
+│   └── svaani/v1/
 │       ├── audio.proto             # Audio ingestion message definitions
 │       ├── transcription.proto     # Transcription & SOAP note definitions
 │       └── fhir.proto              # FHIR push request/response definitions
 ├── scripts/
 │   ├── create-kafka-topics.sh      # Kafka topic provisioning
 │   └── generate-certs.sh           # TLS certificate generation
+├── migrations/                     # SQL database migrations for persistent stores
 ├── services/
 │   ├── api-gateway/                # Go — WebSocket ingestion + REST API (100 msg/sec rate limit)
 │   ├── audio-processor/            # Python — 500ms chunking into 10s windows, O(1) hash map speaker roles, Pyannote
 │   ├── stt-engine/                 # Python — Whisper Large-V3 (LoRA) + IndicTrans2/IndicXlit
-│   ├── clinical-nlp/               # Python — Llama-3.1-8B-Instruct/Sarvam-1 + BGE-m3 LRU Cache
+│   ├── clinical-nlp/               # Python — Sarvam API + ChromaDB (BGE-m3)
 │   └── fhir-adapter/               # Go — FHIR R4 EHR integration (Backoff & DLQ)
-├── shared/                         # Shared libraries + generated protobuf code
+├── shared/
+│   └── go/pkg/consent/             # Patient Consent Module & Vault Key Rotation
 ├── tests/
 │   └── qa/                         # Load testing, chaos engineering, and fuzzing
 ├── .env.example                    # Environment variable template
@@ -216,11 +246,11 @@ python -m stt_engine.main
 ### Protobuf Workflow
 
 ```bash
-# Edit proto files in proto/kraionyx/v1/
+# Edit proto files in proto/svaani/v1/
 # Then regenerate Go code:
 make proto
 
-# Generated code appears in shared/gen/kraionyx/v1/
+# Generated code appears in shared/gen/svaani/v1/
 ```
 
 ---
