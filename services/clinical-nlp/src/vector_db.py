@@ -1,67 +1,59 @@
-import faiss
-import numpy as np
+import os
+import chromadb
+from sentence_transformers import SentenceTransformer
+import logging
 
-class MockPatientHistoryDB:
+logger = logging.getLogger(__name__)
+
+class PatientHistoryDB:
     """
-    Mock Vector Database for Patient History using FAISS.
-    Simulates RAG by storing and retrieving past clinical notes or conditions.
+    Vector Database for Patient History using ChromaDB and BAAI/bge-m3 embeddings.
     """
-    def __init__(self, embedding_dim=1024):
-        self.embedding_dim = embedding_dim
-        # Using L2 distance for similarity
-        self.index = faiss.IndexFlatL2(embedding_dim)
-        self.documents = []
-        self.patient_map = {} # Maps patient_id to their document indices
-        self.max_patients = 1000 # LRU capacity
+    def __init__(self, persist_directory="./chroma_db"):
+        self.client = chromadb.PersistentClient(path=persist_directory)
+        self.collection = self.client.get_or_create_collection(name="patient_history")
         
-    def _mock_embed(self, text: str) -> np.ndarray:
-        # Mock BGE-m3 embedding logic (which typically uses 1024 dimensions)
-        np.random.seed(abs(hash(text)) % (2**32))
-        vec = np.random.randn(self.embedding_dim).astype('float32')
-        faiss.normalize_L2(vec.reshape(1, -1))
-        return vec.reshape(1, -1)
-        
+        logger.info("Loading BAAI/bge-m3 embedding model...")
+        try:
+            self.encoder = SentenceTransformer("BAAI/bge-m3")
+            logger.info("Embedding model loaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to load embedding model: {e}")
+            self.encoder = None
+
     def add_history(self, patient_id: str, document: str):
-        vec = self._mock_embed(document)
-        idx = len(self.documents)
-        self.documents.append(document)
-        self.index.add(vec)
+        if not self.encoder:
+            logger.error("Cannot add history: Embedding model not loaded.")
+            return
+
+        embedding = self.encoder.encode(document).tolist()
+        doc_id = str(abs(hash(document)) % (10 ** 8))
         
-        if patient_id in self.patient_map:
-            # Move to end to mark as recently used
-            docs = self.patient_map.pop(patient_id)
-            self.patient_map[patient_id] = docs
-        else:
-            self.patient_map[patient_id] = []
-            
-            # LRU eviction
-            if len(self.patient_map) > self.max_patients:
-                # Remove oldest patient from map
-                oldest_patient = next(iter(self.patient_map))
-                del self.patient_map[oldest_patient]
-                # Note: For a true mock, we'd also clean up self.documents and self.index,
-                # but to avoid complex index rebuilding in this mock, we just drop the patient reference.
-                
-        self.patient_map[patient_id].append(idx)
+        self.collection.upsert(
+            documents=[document],
+            embeddings=[embedding],
+            metadatas=[{"patient_id": patient_id}],
+            ids=[f"{patient_id}_{doc_id}"]
+        )
+        logger.debug(f"Added history for patient {patient_id}")
         
     def retrieve_history(self, patient_id: str, query: str, top_k: int = 2) -> list[str]:
-        if patient_id not in self.patient_map or not self.patient_map[patient_id]:
+        if not self.encoder:
+            logger.error("Cannot retrieve history: Embedding model not loaded.")
             return []
-            
-        # Update LRU
-        docs = self.patient_map.pop(patient_id)
-        self.patient_map[patient_id] = docs
-            
-        query_vec = self._mock_embed(query)
-        # For simplicity in mock: just return the patient's past documents 
-        # In actual FAISS, we'd search within the subset or filter post-search
-        # Here we'll do a global search and filter by patient
-        D, I = self.index.search(query_vec, self.index.ntotal)
+
+        query_embedding = self.encoder.encode(query).tolist()
         
-        results = []
-        for idx in I[0]:
-            if idx in self.patient_map.get(patient_id, []) and idx != -1:
-                results.append(self.documents[idx])
-                if len(results) >= top_k:
-                    break
-        return results
+        try:
+            results = self.collection.query(
+                query_embeddings=[query_embedding],
+                n_results=top_k,
+                where={"patient_id": patient_id}
+            )
+            
+            if results and "documents" in results and results["documents"]:
+                return results["documents"][0]
+        except Exception as e:
+            logger.error(f"Failed to query ChromaDB: {e}")
+            
+        return []

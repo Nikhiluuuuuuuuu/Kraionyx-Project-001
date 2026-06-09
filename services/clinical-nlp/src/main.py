@@ -14,6 +14,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from src.consumer import ClinicalConsumer
 from src.producer import ClinicalProducer
 from src.agents import ClinicalWorkflow
+from src.pii_redactor import PIIRedactor
 from .config import Config
 
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +25,8 @@ MESSAGES_PROCESSED = Counter("clinical_nlp_messages_processed_total", "Total Cli
 PROCESSING_ERRORS = Counter("clinical_nlp_processing_errors_total", "Total Clinical NLP processing errors")
 PROCESSING_DURATION = Histogram("clinical_nlp_processing_duration_seconds", "Duration of processing in seconds")
 
-workflow = ClinicalWorkflow(use_mock_llm=True)
+workflow = ClinicalWorkflow(use_mock_llm=False)  # We will change llm to use Sarvam API
+pii_redactor = PIIRedactor()
 
 def init_tracer():
     resource = Resource(attributes={"service.name": "clinical-nlp"})
@@ -73,11 +75,17 @@ def main():
                 span.set_attribute("patient_id", patient_id)
                 transcript = data.get("transcript", "")
                 
-                result = workflow.process_transcript(patient_id, transcript)
+                # CRITICAL: Clean PHI before sending data to AI
+                clean_transcript, redactions = pii_redactor.redact(transcript)
+                if redactions:
+                    logger.info(f"Redacted {len(redactions)} PII entities from transcript for patient {patient_id}")
+                
+                result = workflow.process_transcript(patient_id, clean_transcript)
                 
                 output_data = {
                     "patient_id": patient_id,
-                    "original_transcript": transcript,
+                    "original_transcript": transcript,  # Consider if we should send clean_transcript instead depending on downstream
+                    "clean_transcript": clean_transcript,
                     "result": result
                 }
                 
