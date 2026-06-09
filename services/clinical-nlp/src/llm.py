@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import logging
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ class LLMBackend:
         self.api_url = os.getenv("LLM_API_URL", "https://api.sarvam.ai/text-generate")
         self.api_key = os.getenv("SARVAM_API_KEY", "")
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def generate(self, prompt: str) -> str:
         if self.use_mock:
             if "Extract clinical entities" in prompt:
