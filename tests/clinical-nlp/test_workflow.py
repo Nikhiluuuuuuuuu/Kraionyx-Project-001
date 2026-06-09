@@ -3,7 +3,7 @@ from src.agents import ClinicalWorkflow
 
 class TestClinicalWorkflow:
     def setup_method(self):
-        self.workflow = ClinicalWorkflow(use_mock_llm=False)
+        self.workflow = ClinicalWorkflow()
         self.workflow.vector_db.add_history("patient_123", "Patient has a history of chronic migraines.")
 
     @patch('src.llm.LLMBackend.generate')
