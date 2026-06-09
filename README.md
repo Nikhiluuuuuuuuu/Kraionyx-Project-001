@@ -19,9 +19,9 @@ Engineered for extreme reliability, the platform targets Tier-1 Production stand
 
 The platform has been upgraded to a 10/10 Tier-1 production level with the following architectural enhancements:
 
-- **Advanced Observability**: Full OpenTelemetry distributed tracing and a Prometheus/Grafana stack located in `deploy/observability`.
+- **Advanced Observability**: Full OpenTelemetry distributed tracing and a Prometheus/Grafana stack located in `deploy/observability`. Enterprise structured JSON logging via `structlog` is enabled across all Python microservices.
 - **Kubernetes Orchestration**: Production-ready Helm charts (`deploy/helm/`) featuring Istio mTLS and dynamic HashiCorp Vault sidecar injection.
-- **Robust CI/CD & Security**: Automated GitHub Actions pipelines incorporating Trivy and gosec security scanning.
+- **Robust CI/CD & Security**: Automated GitHub Actions pipelines incorporating Trivy and gosec security scanning, alongside a strict 70% test coverage gate.
 - **Medical AI Benchmarking**: Comprehensive validation suites for WER (Word Error Rate) and Clinical Entity Evaluation integrated within `services/clinical-nlp` and `services/stt-engine`.
 - **Compliance & Privacy**: Dedicated Patient Consent Module (`shared/go/pkg/consent`) and automated Vault key rotation scripts for strict lifecycle management.
 
@@ -89,10 +89,10 @@ graph TB
 
 | Stage | Kafka Topic | Service | Technology |
 |-------|-------------|---------|------------|
-| 1. Ingest | `audio.raw.chunks` | API Gateway | Go, WebSocket, TLS 1.3, 100 msg/sec limit |
+| 1. Ingest | `audio.raw.chunks` | API Gateway | Go, WebSocket, TLS 1.3, Global Redis rate limiting (100 msg/sec) |
 | 2. Preprocess | `audio.preprocessed` | Audio Processor | Python, pyannote (500ms chunks to 10s windows, O(1) role hash map) |
 | 3. Transcribe | `transcription.results` | STT Engine | Python, OpenAI Whisper Large-V3 w/ LoRA (IndicTrans2/IndicXlit) |
-| 4. Generate Notes | `clinical.notes.created` | Clinical NLP | Python, Multi-Agent (Sarvam API), ChromaDB (BGE-m3) |
+| 4. Generate Notes | `clinical.notes.created` | Clinical NLP | Python, Multi-Agent (Sarvam API with Tenacity retries), ChromaDB (BGE-m3 with `CHROMA_PERSIST_DIR` for PersistentVolumes) |
 | 5. Push to EHR | `fhir.outbound` | FHIR Adapter | Go, FHIR R4, Exp Backoff & DLQ |
 
 ---
