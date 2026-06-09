@@ -1,12 +1,12 @@
-"""Setup file for the kraionyx_common shared package."""
+"""Setup file for the svaani_common shared package."""
 
 from setuptools import setup, find_packages
 
 setup(
-    name="kraionyx-common",
+    name="svaani-common",
     version="0.1.0",
-    description="Shared libraries for Kraionyx medical AI microservices",
-    author="Kraionyx Team",
+    description="Shared libraries for Svaani medical AI microservices",
+    author="Svaani Team",
     python_requires=">=3.11",
     packages=find_packages(),
     install_requires=[

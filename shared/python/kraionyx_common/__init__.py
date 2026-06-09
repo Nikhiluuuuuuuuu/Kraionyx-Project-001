@@ -1,10 +1,10 @@
-"""Kraionyx Common - Shared libraries for Kraionyx medical AI microservices."""
+"""Svaani Common - Shared libraries for Svaani medical AI microservices."""
 
 __version__ = "0.1.0"
-__author__ = "Kraionyx Team"
+__author__ = "Svaani Team"
 
-from kraionyx_common.crypto import AES256GCM
-from kraionyx_common.models import (
+from svaani_common.crypto import AES256GCM
+from svaani_common.models import (
     AudioChunkMessage,
     AuditEvent,
     ClinicalNoteMessage,
@@ -13,7 +13,7 @@ from kraionyx_common.models import (
     SpeakerSegment,
     TranscriptionResultMessage,
 )
-from kraionyx_common.audit import AuditLogger
+from svaani_common.audit import AuditLogger
 
 __all__ = [
     "AES256GCM",

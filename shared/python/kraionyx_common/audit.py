@@ -11,14 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
+import structlog
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
-from kraionyx_common.models import AuditEvent
+from svaani_common.models import AuditEvent
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _AUDIT_TOPIC = "audit.events"
 

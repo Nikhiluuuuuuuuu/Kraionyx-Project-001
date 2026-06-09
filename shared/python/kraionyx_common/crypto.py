@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import base64
-import logging
+import structlog
 import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _NONCE_SIZE = 12  # 96-bit nonce required by GCM
 _KEY_SIZE = 32    # 256-bit key

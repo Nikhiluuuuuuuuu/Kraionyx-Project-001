@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kraionyx/shared/pkg/models"
+	"github.com/svaani/shared/pkg/models"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -59,36 +59,37 @@ func NewLogger(producer *kgo.Client, logger *slog.Logger, service string) *Logge
 
 // LogAccess records an audit event for data access (read) operations.
 // The detail field must NOT contain PHI or PII — only resource metadata.
-func (l *Logger) LogAccess(ctx context.Context, userID, resourceType, resourceID, detail, sourceIP string) {
-	l.logEvent(ctx, userID, ActionRead, resourceType, resourceID, OutcomeSuccess, detail, sourceIP)
+func (l *Logger) LogAccess(ctx context.Context, tenantID, userID, resourceType, resourceID, detail, sourceIP string) {
+	l.logEvent(ctx, tenantID, userID, ActionRead, resourceType, resourceID, OutcomeSuccess, detail, sourceIP)
 }
 
 // LogModification records an audit event for data modification (create/update) operations.
-func (l *Logger) LogModification(ctx context.Context, userID, action, resourceType, resourceID, detail, sourceIP string) {
+func (l *Logger) LogModification(ctx context.Context, tenantID, userID, action, resourceType, resourceID, detail, sourceIP string) {
 	if action != ActionCreate && action != ActionUpdate {
 		action = ActionUpdate
 	}
-	l.logEvent(ctx, userID, action, resourceType, resourceID, OutcomeSuccess, detail, sourceIP)
+	l.logEvent(ctx, tenantID, userID, action, resourceType, resourceID, OutcomeSuccess, detail, sourceIP)
 }
 
 // LogDeletion records an audit event for data deletion operations.
-func (l *Logger) LogDeletion(ctx context.Context, userID, resourceType, resourceID, detail, sourceIP string) {
-	l.logEvent(ctx, userID, ActionDelete, resourceType, resourceID, OutcomeSuccess, detail, sourceIP)
+func (l *Logger) LogDeletion(ctx context.Context, tenantID, userID, resourceType, resourceID, detail, sourceIP string) {
+	l.logEvent(ctx, tenantID, userID, ActionDelete, resourceType, resourceID, OutcomeSuccess, detail, sourceIP)
 }
 
 // LogAuthentication records an audit event for authentication attempts.
 // The outcome should be OutcomeSuccess or OutcomeFailure.
-func (l *Logger) LogAuthentication(ctx context.Context, userID, outcome, detail, sourceIP string) {
-	l.logEvent(ctx, userID, ActionLogin, "Authentication", userID, outcome, detail, sourceIP)
+func (l *Logger) LogAuthentication(ctx context.Context, tenantID, userID, outcome, detail, sourceIP string) {
+	l.logEvent(ctx, tenantID, userID, ActionLogin, "Authentication", userID, outcome, detail, sourceIP)
 }
 
 // logEvent constructs an AuditEvent, logs it via slog, and asynchronously publishes
 // it to the Kafka audit topic. Kafka publish failures are logged but do not
 // propagate errors to callers — audit logging must never block the main request path.
-func (l *Logger) logEvent(ctx context.Context, userID, action, resourceType, resourceID, outcome, detail, sourceIP string) {
+func (l *Logger) logEvent(ctx context.Context, tenantID, userID, action, resourceType, resourceID, outcome, detail, sourceIP string) {
 	event := models.AuditEvent{
 		EventID:      uuid.New().String(),
 		Timestamp:    time.Now().UTC().Format(time.RFC3339Nano),
+		TenantID:     tenantID,
 		UserID:       userID,
 		Action:       action,
 		ResourceType: resourceType,
@@ -101,6 +102,7 @@ func (l *Logger) logEvent(ctx context.Context, userID, action, resourceType, res
 	// Structured slog output for local log aggregation.
 	l.logger.InfoContext(ctx, "audit_event",
 		slog.String("event_id", event.EventID),
+		slog.String("tenant_id", event.TenantID),
 		slog.String("user_id", event.UserID),
 		slog.String("action", event.Action),
 		slog.String("resource_type", event.ResourceType),
