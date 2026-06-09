@@ -1,0 +1,1 @@
+flake8==6.1.0\npytest==7.4.4\npytest-cov==4.1.0\nbandit==1.7.6\nblack==23.12.1\nisort==5.13.2

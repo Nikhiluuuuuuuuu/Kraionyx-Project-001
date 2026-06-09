@@ -1,3 +1,7 @@
+from presidio_analyzer import AnalyzerEngine
+from presidio_anonymizer import AnonymizerEngine
+from presidio_anonymizer.entities import OperatorConfig
+
 class PIIRedactor:
     """
     HIPAA-compliant Personal Identifiable Information (PII) redactor.
@@ -6,6 +10,10 @@ class PIIRedactor:
     sensitive patient information (such as names, phone numbers, addresses, 
     and SSNs) prior to processing or long-term storage.
     """
+    
+    def __init__(self):
+        self.analyzer = AnalyzerEngine()
+        self.anonymizer = AnonymizerEngine()
 
     def redact(self, text: str) -> tuple[str, list]:
         """
@@ -13,7 +21,7 @@ class PIIRedactor:
 
         The redaction process utilizes a combination of Named Entity Recognition (NER)
         and strict regular expression pattern matching to replace sensitive data 
-        with placeholder tokens (e.g., [PATIENT_NAME], [PHONE]).
+        with placeholder tokens (e.g., [PERSON], [PHONE_NUMBER]).
 
         Args:
             text (str): The raw clinical transcript potentially containing PHI.
@@ -25,42 +33,31 @@ class PIIRedactor:
                   including their location, category, and detection confidence score.
                   (Useful for auditing and low-confidence human review queues).
         """
-        import re
         
-        # A robust mock of Microsoft Presidio functionality using Regex
-        # In a real production system, this would be replaced by:
-        # from presidio_analyzer import AnalyzerEngine
-        # from presidio_anonymizer import AnonymizerEngine
+        # Analyze text for PII entities
+        analyzer_results = self.analyzer.analyze(text=text, language='en')
         
         entities = []
-        redacted_text = text
-        
-        # Define mock Presidio recognizers using regex
-        recognizers = {
-            "PHONE_NUMBER": r"\b\d{3}[-.\s]??\d{3}[-.\s]??\d{4}\b",
-            "EMAIL_ADDRESS": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b",
-            "SSN": r"\b\d{3}-\d{2}-\d{4}\b",
+        for res in analyzer_results:
+            entities.append({
+                "entity_type": res.entity_type,
+                "start": res.start,
+                "end": res.end,
+                "score": res.score,
+                "text": text[res.start:res.end]
+            })
+            
+        # Define anonymization operators to replace with entity type
+        operators = {
+            "DEFAULT": OperatorConfig("replace", {"new_value": lambda x: f"[{x.entity_type}]"})
         }
         
-        for entity_type, pattern in recognizers.items():
-            for match in re.finditer(pattern, text):
-                start, end = match.span()
-                entity = {
-                    "entity_type": entity_type,
-                    "start": start,
-                    "end": end,
-                    "score": 0.99, # High confidence mock score
-                    "text": match.group()
-                }
-                entities.append(entity)
+        # Anonymize text
+        anonymized_result = self.anonymizer.anonymize(
+            text=text,
+            analyzer_results=analyzer_results,
+            operators=operators
+        )
         
-        # Sort entities by start index in reverse to replace without messing up indices
-        entities.sort(key=lambda x: x["start"], reverse=True)
-        for entity in entities:
-            start = entity["start"]
-            end = entity["end"]
-            replacement = f"[{entity['entity_type']}]"
-            redacted_text = redacted_text[:start] + replacement + redacted_text[end:]
-            
-        return redacted_text, entities
+        return anonymized_result.text, entities
 
