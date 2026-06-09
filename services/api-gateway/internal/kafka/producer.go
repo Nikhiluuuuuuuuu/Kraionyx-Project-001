@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kraionyx/shared/pkg/models"
+	"github.com/svaani/shared/pkg/models"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 

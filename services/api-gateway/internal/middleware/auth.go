@@ -1,10 +1,11 @@
 package middleware
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	sharedAuth "github.com/kraionyx/shared/pkg/auth"
+	sharedAuth "github.com/svaani/shared/pkg/auth"
 )
 
 func AuthMiddleware(validator *sharedAuth.OIDCValidator) fiber.Handler {
@@ -28,6 +29,23 @@ func AuthMiddleware(validator *sharedAuth.OIDCValidator) fiber.Handler {
 
 		c.Locals("user_id", token.Subject)
 
+		var claims map[string]interface{}
+		if err := token.Claims(&claims); err == nil {
+			var tenantID string
+			if tid, ok := claims["tenant_id"].(string); ok {
+				tenantID = tid
+			} else if tid, ok := claims["tid"].(string); ok { // Azure AD uses 'tid'
+				tenantID = tid
+			}
+			
+			if tenantID != "" {
+				c.Locals("tenant_id", tenantID)
+				ctx := context.WithValue(c.UserContext(), sharedAuth.TenantIDKey, tenantID)
+				c.SetUserContext(ctx)
+			}
+		}
+
 		return c.Next()
 	}
 }
+
