@@ -479,3 +479,53 @@ Adopt **structlog** and **python-json-logger** across all Python microservices t
 
 - **Positive**: Exceptional observability, zero log-parsing issues in Logstash/FluentBit, immediate correlation of errors.
 - **Negative**: Minor learning curve for developers used to `logging.info("msg %s", var)`.
+
+---
+
+## ADR-017: Durable Postgres Consent Store
+
+**Status:** Accepted
+**Date:** 2026-06
+
+### Context
+
+Relying on `InMemoryStore` for tracking patient consent approvals exposes the platform to catastrophic data loss on restart, violating strict HIPAA rules around auditing and durability of patient consent records.
+
+### Decision
+
+Implement a durable **PostgresConsentStore** backing the consent service interface.
+
+### Rationale
+
+- Ensures consent transactions are ACID compliant and durably persisted.
+- Protects the system against pod evictions and restarts, maintaining a permanent audit trail of grants and revocations.
+
+### Consequences
+
+- **Positive**: HIPAA/DPDPA compliant persistent consent tracking.
+- **Negative**: Adds PostgreSQL dependency to the data plane, requiring database migrations and connection management.
+
+---
+
+## ADR-018: Strict Nil-Check on Rate Limiter Storage
+
+**Status:** Accepted
+**Date:** 2026-06
+
+### Context
+
+If the Fiber rate limiter fails to connect to Redis during startup and falls back to a nil store, it silently degrades to an in-memory fallback. This can lead to local-only rate limiting, bypassing global limits in a horizontally scaled environment.
+
+### Decision
+
+Enforce a strict nil-check (`store == nil`) and `log.Fatal` panic on startup if the Redis connection is unavailable.
+
+### Rationale
+
+- In a medical-grade system, it's safer to fail loud and refuse to start rather than run in a degraded, vulnerable state.
+- Prevents split-brain rate limits across multiple gateway replicas.
+
+### Consequences
+
+- **Positive**: Enforces global API rate limiting consistently.
+- **Negative**: Hard dependency on Redis availability during Gateway boot.
