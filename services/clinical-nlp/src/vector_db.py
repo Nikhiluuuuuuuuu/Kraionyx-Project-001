@@ -2,6 +2,7 @@ import os
 import chromadb
 from sentence_transformers import SentenceTransformer
 import logging
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class PatientHistoryDB:
             return
 
         embedding = self.encoder.encode(document).tolist()
-        doc_id = str(abs(hash(document)) % (10 ** 8))
+        doc_id = hashlib.sha256(document.encode()).hexdigest()[:16]
         
         self.collection.upsert(
             documents=[document],
