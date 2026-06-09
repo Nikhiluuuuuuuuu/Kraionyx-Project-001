@@ -51,7 +51,7 @@ C4Context
 
 ### Context
 
-Svaani requires both high-performance network services (WebSocket ingestion, FHIR API integration) and GPU-accelerated ML inference (speech recognition, speaker diarization, clinical NLP). No single language excels at both.
+Svaani requires both high-performance network services (WebSocket ingestion, FHIR API integration) and CPU-bound ML/AI inference (speech recognition, speaker diarization, clinical NLP) relying on external APIs. No single language excels at both.
 
 ### Decision
 
@@ -274,7 +274,7 @@ Implement strict **100 msg/sec rate limiting** at the API Gateway level.
 ### Rationale
 
 - Ensures downstream components (Kafka, Audio Processor) are not overwhelmed during traffic spikes or DoS attempts.
-- Protects GPU inference resources from being bottlenecked.
+- Protects downstream API resources from being bottlenecked.
 
 ### Consequences
 
