@@ -29,7 +29,9 @@ All requests must include one of the following authentication methods:
 | API Key (query) | `?api_key=` | `?api_key=sk_live_abc123...` |
 | Bearer Token | `Authorization` | `Authorization: Bearer eyJhbG...` |
 
-**API Key** authentication is recommended for WebSocket connections where custom headers may not be supported by all clients.
+**Bearer Token (JWT)** authentication is strictly recommended for production. The API Gateway extracts the `tenant_id` and `user_id` from the JWT to enforce Tier 2 Schema Isolation and ensure correct Audit Logging.
+
+**API Key** authentication is supported for legacy/WebSocket testing but bypasses strict tenant isolation if not mapped properly in Keycloak.
 
 ---
 
@@ -45,11 +47,11 @@ wss://host:8443/ws/audio
 
 ```bash
 # Using websocat (for testing)
-websocat -k "wss://localhost:8443/ws/audio?api_key=your_api_key"
+websocat -k "wss://localhost:8443/ws/audio?token=your_jwt_token"
 
 # Using wscat
 wscat -c "wss://localhost:8443/ws/audio" \
-  -H "X-API-Key: your_api_key" \
+  -H "Authorization: Bearer your_jwt_token" \
   --no-check
 ```
 
@@ -146,7 +148,7 @@ import json
 import struct
 
 async def stream_audio(audio_file_path: str):
-    uri = "wss://localhost:8443/ws/audio?api_key=your_api_key"
+    uri = "wss://localhost:8443/ws/audio?token=your_jwt_token"
     
     async with websockets.connect(uri, ssl=True) as ws:
         # Start session
@@ -315,7 +317,7 @@ Retrieve the current status and metadata of a recording session.
 
 **Request:**
 ```bash
-curl -k -H "X-API-Key: your_api_key" \
+curl -k -H "Authorization: Bearer your_jwt_token" \
   https://localhost:8443/api/v1/sessions/01HXYZ...
 ```
 
@@ -362,7 +364,7 @@ Manually close an active recording session and trigger downstream processing.
 
 **Request:**
 ```bash
-curl -k -X POST -H "X-API-Key: your_api_key" \
+curl -k -X POST -H "Authorization: Bearer your_jwt_token" \
   https://localhost:8443/api/v1/sessions/01HXYZ.../close
 ```
 
@@ -427,7 +429,7 @@ All error responses follow a consistent structure:
 
 ## Rate Limiting
 
-Rate limits are enforced per API key using a sliding window algorithm backed by Redis.
+Rate limits are enforced per tenant or API key using a sliding window algorithm backed by Redis.
 
 | Endpoint | Limit | Window | Header |
 |----------|-------|--------|--------|
