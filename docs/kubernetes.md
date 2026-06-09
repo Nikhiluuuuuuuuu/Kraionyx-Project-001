@@ -68,6 +68,10 @@ Check the status of the pods and ensure all containers (including Istio proxy an
 kubectl get pods -n svaani-prod
 ```
 
+## Persistent Storage
+
+The Clinical NLP service uses ChromaDB for RAG, which requires persistent storage across pod restarts. The Helm charts utilize `PersistentVolumeClaim` (PVC) mounts mapped to the `CHROMA_PERSIST_DIR` environment variable to ensure vector database resilience.
+
 ## Security Posture
 
 - **mTLS**: Automatically enforced by Istio. Services will reject non-mTLS traffic.

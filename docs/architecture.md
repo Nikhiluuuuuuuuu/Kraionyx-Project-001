@@ -454,3 +454,28 @@ Adopt **HashiCorp Vault** for centralized secrets management and PKI for dynamic
 
 - **Positive**: Simplifies compliance audits, automates key rotation, ensures secrets are injected only at runtime.
 - **Negative**: Introduces a critical dependency; if Vault goes down, services cannot boot or rotate keys.
+
+---
+
+## ADR-016: Structured JSON Logging (structlog)
+
+**Status:** Accepted
+**Date:** 2026-06
+
+### Context
+
+Standard Python logging outputs raw strings which are difficult to parse in ELK/Datadog stacks, and traceback formatting can span multiple lines making trace-id correlation impossible.
+
+### Decision
+
+Adopt **structlog** and **python-json-logger** across all Python microservices to enforce strictly typed JSON logging.
+
+### Rationale
+
+- Ensures all logs are machine-readable and strictly keyed with `trace_id` and `tenant_id`.
+- Intercepts uncaught exceptions and prints them as structured single-line JSON events.
+
+### Consequences
+
+- **Positive**: Exceptional observability, zero log-parsing issues in Logstash/FluentBit, immediate correlation of errors.
+- **Negative**: Minor learning curve for developers used to `logging.info("msg %s", var)`.
