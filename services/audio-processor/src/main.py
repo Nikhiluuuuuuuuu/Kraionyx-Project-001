@@ -23,8 +23,8 @@ import numpy as np
 import redis
 from prometheus_client import start_http_server, Counter, Histogram
 
-from kraionyx_common.crypto import AES256GCM
-from kraionyx_common.models import AudioChunkMessage, PipelineError
+from svaani_common.crypto import AES256GCM
+from svaani_common.models import AudioChunkMessage, PipelineError
 
 from .config import Config
 from .consumer import AudioConsumer

@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-stt-engine
+  name: {{ include "svaani.fullname" . }}-stt-engine
   labels:
     app.kubernetes.io/name: stt-engine
     app.kubernetes.io/instance: {{ .Release.Name }}

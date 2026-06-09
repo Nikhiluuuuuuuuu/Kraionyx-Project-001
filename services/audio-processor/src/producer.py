@@ -11,7 +11,7 @@ from typing import Any
 
 from confluent_kafka import Producer
 
-from kraionyx_common.models import PipelineError
+from svaani_common.models import PipelineError
 
 from .config import Config
 

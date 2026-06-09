@@ -26,8 +26,8 @@ if ! command -v jq &> /dev/null; then
 fi
 
 # Rotate Transit Engine Key
-# Assumes the transit secrets engine is mounted at 'transit/' and the key is 'kraionyx-app-key'
-TRANSIT_KEY="kraionyx-app-key"
+# Assumes the transit secrets engine is mounted at 'transit/' and the key is 'svaani-app-key'
+TRANSIT_KEY="svaani-app-key"
 
 echo "Rotating transit key: $TRANSIT_KEY..."
 # Use the Vault CLI to rotate the transit key
@@ -45,7 +45,7 @@ echo "Transit key '$TRANSIT_KEY' latest version is now: $LATEST_VERSION."
 
 # Example: Rotate Database root credentials (if database secrets engine is configured)
 # echo "Rotating database credentials..."
-# vault write -f database/rotate-root/kraionyx-db
+# vault write -f database/rotate-root/svaani-db
 
 # Example: Update minimal key version to enforce usage of new keys (optional)
 # MIN_VERSION=$((LATEST_VERSION - 1))

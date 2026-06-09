@@ -1,6 +1,6 @@
 # API Documentation
 
-This document describes the public API surface of the Kraionyx API Gateway.
+This document describes the public API surface of the Svaani API Gateway.
 
 **Base URL**: `https://localhost:8443` (development)
 

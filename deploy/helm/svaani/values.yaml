@@ -7,25 +7,25 @@ vault:
 
 apiGateway:
   replicaCount: 2
-  image: kraionyx/api-gateway:latest
+  image: svaani/api-gateway:latest
   port: 8080
 
 fhirAdapter:
   replicaCount: 2
-  image: kraionyx/fhir-adapter:latest
+  image: svaani/fhir-adapter:latest
   port: 8080
 
 clinicalNlp:
   replicaCount: 2
-  image: kraionyx/clinical-nlp:latest
+  image: svaani/clinical-nlp:latest
   port: 8080
 
 sttEngine:
   replicaCount: 2
-  image: kraionyx/stt-engine:latest
+  image: svaani/stt-engine:latest
   port: 8080
 
 audioProcessor:
   replicaCount: 2
-  image: kraionyx/audio-processor:latest
+  image: svaani/audio-processor:latest
   port: 8080

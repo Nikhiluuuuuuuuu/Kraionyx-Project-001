@@ -4,7 +4,7 @@ import numpy as np
 from src.config import Config
 from src.consumer import AudioConsumer
 from src.producer import AudioProducer
-from kraionyx_common.models import AudioChunkMessage
+from svaani_common.models import AudioChunkMessage
 
 @pytest.fixture
 def mock_config():

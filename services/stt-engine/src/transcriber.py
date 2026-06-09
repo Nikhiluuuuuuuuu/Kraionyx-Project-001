@@ -1,9 +1,8 @@
 import numpy as np
-import torch
-from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq, BitsAndBytesConfig
-from peft import PeftModel, PeftConfig
-from indicxlit import Transliterator
-from indictrans import IndicTrans
+import requests
+import io
+import os
+import soundfile as sf
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,82 +10,40 @@ logger = logging.getLogger(__name__)
 class MedicalTranscriber:
     """
     High-performance speech-to-text (STT) transcription engine utilizing 
-    OpenAI Whisper Large-V3 with LoRA support.
+    Sarvam AI's API.
 
-    This transcriber is highly optimized for GPU execution and handles medical 
-    domain audio robustly. It employs INT8 quantization via bitsandbytes to fit 
-    into a 16GB-24GB VRAM envelope while preserving transcription and reasoning accuracy.
-    Includes IndicTrans2 translation layer and IndicXlit logic for Romanized inputs.
+    This transcriber uses an HTTP client to call the Sarvam AI Speech-to-Text API,
+    replacing the previous local Whisper/LoRA models to save compute resources.
+    The api key is securely loaded via the SARVAM_API_KEY environment variable.
     """
 
-    def __init__(self, model_name="openai/whisper-large-v3", lora_weights=None, device="cuda", compute_type="int8"):
+    def __init__(self, model_name=None, lora_weights=None, device=None, compute_type=None):
         """
-        Initializes the model with INT8 quantization and optional LoRA.
-
-        Args:
-            model_name (str): The name or path of the model to load.
-            lora_weights (str): Optional path to LoRA adapters.
-            device (str): Execution device ("cuda", "cpu"). Defaults to "cuda".
-            compute_type (str): Hardware quantization method ("int8", "fp8").
+        Initializes the transcriber to use Sarvam API.
+        Arguments are kept for backward compatibility but ignored.
         """
-        self.model_name = model_name
-        self.device = device if torch.cuda.is_available() else "cpu"
-        self.compute_type = compute_type
-
-        logger.info(f"Loading processor for {self.model_name}...")
-        self.processor = AutoProcessor.from_pretrained(self.model_name)
-
-        logger.info(f"Loading model {self.model_name} with {self.compute_type} quantization...")
+        self.api_key = os.environ.get("SARVAM_API_KEY", "")
+        if not self.api_key:
+            logger.warning("SARVAM_API_KEY environment variable is not set. API calls will likely fail.")
         
-        # Configure INT8 quantization to fit within 16-24GB VRAM
-        if self.compute_type == "int8" and self.device == "cuda":
-            quantization_config = BitsAndBytesConfig(
-                load_in_8bit=True,
-                llm_int8_threshold=6.0,
-            )
-        elif self.compute_type == "fp8" and self.device == "cuda":
-            quantization_config = BitsAndBytesConfig(
-                load_in_8bit_fp32_cpu_offload=False,
-                load_in_8bit=True, 
-            )
-        else:
-            quantization_config = None
-
-        self.model = AutoModelForSpeechSeq2Seq.from_pretrained(
-            self.model_name,
-            quantization_config=quantization_config,
-            device_map="auto" if self.device == "cuda" else None,
-            torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-            trust_remote_code=True,
-        )
-
-        if lora_weights:
-            logger.info(f"Applying LoRA weights from {lora_weights}...")
-            self.model = PeftModel.from_pretrained(self.model, lora_weights)
-
-        logger.info("Initializing IndicTrans2 translation layer...")
-        self.translator = IndicTrans(dir='indic-en')
-
-        logger.info("Initializing IndicXlit transliteration logic...")
-        self.transliterator = Transliterator(source="en", target="hi")
-
-        logger.info("Whisper model with Indic support loaded successfully.")
+        # Using the translate endpoint to provide both transcribed and translated text
+        self.url = "https://api.sarvam.ai/speech-to-text-translate"
 
     def handle_code_mixed(self, text: str) -> str:
         """
-        Handles Romanized/code-mixed Indic language inputs.
+        Handled transparently by Sarvam AI in most cases.
         """
-        return self.transliterator.transliterate(text)
+        return text
 
     def translate_to_english(self, text: str) -> str:
         """
-        Translates text to English via IndicTrans2.
+        Handled by the Sarvam AI speech-to-text-translate API.
         """
-        return self.translator.translate_paragraph(text)
+        return text
 
     def transcribe(self, audio: np.ndarray) -> dict:
         """
-        Transcribes a raw audio waveform into text.
+        Transcribes a raw audio waveform into text using Sarvam AI.
 
         Args:
             audio (np.ndarray): A 1D numpy array containing the raw PCM audio 
@@ -95,41 +52,52 @@ class MedicalTranscriber:
 
         Returns:
             dict: A dictionary containing the transcription results:
-                - "text" (str): The final, concatenated transcript of the audio snippet.
+                - "text" (str): The final, concatenated transcript.
+                - "processed_text" (str): The processed transcript.
                 - "translated_text" (str): The English translated output.
         """
         if len(audio) == 0:
-            return {"text": "", "translated_text": ""}
+            return {"text": "", "processed_text": "", "translated_text": ""}
 
-        # Process the audio input
-        inputs = self.processor(
-            audio, 
-            sampling_rate=16000, 
-            return_tensors="pt"
-        )
-        
-        if self.device == "cuda":
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        try:
+            # Convert numpy array to WAV bytes in memory
+            buffer = io.BytesIO()
+            sf.write(buffer, audio, 16000, format='WAV')
+            buffer.seek(0)
 
-        # Generate transcription
-        with torch.no_grad():
-            generated_ids = self.model.generate(
-                **inputs,
-                max_new_tokens=256,
-                num_beams=3,
-            )
+            headers = {
+                "api-subscription-key": self.api_key
+            }
+            
+            files = {
+                "file": ("audio.wav", buffer, "audio/wav")
+            }
+            
+            # Using prompt / model if required by API, Sarvam typically accepts 'model' or 'prompt'
+            # The 'model' could be specific depending on exact Sarvam API spec, but omitting it 
+            # if default applies, or adding "model": "saaras:v1" if needed.
+            data = {}
 
-        transcribed_text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-        
-        # Apply IndicXlit for Romanized/code-mixed inputs
-        processed_text = self.handle_code_mixed(transcribed_text)
-        
-        # Apply IndicTrans2 for English translation
-        translated_text = self.translate_to_english(processed_text)
-        
-        return {
-            "text": transcribed_text,
-            "processed_text": processed_text,
-            "translated_text": translated_text
-        }
+            response = requests.post(self.url, headers=headers, files=files, data=data, timeout=60)
+            response.raise_for_status()
+            result = response.json()
+            
+            # Extract transcript and translated text
+            # Sarvam API returns JSON depending on endpoint. Example: {"transcript": "..."}
+            transcribed_text = result.get("transcript", "")
+            translated_text = result.get("translated_text", transcribed_text)
+
+            return {
+                "text": transcribed_text,
+                "processed_text": transcribed_text,
+                "translated_text": translated_text
+            }
+
+        except Exception as e:
+            logger.error(f"Error calling Sarvam STT API: {e}")
+            return {
+                "text": "",
+                "processed_text": "",
+                "translated_text": ""
+            }
 

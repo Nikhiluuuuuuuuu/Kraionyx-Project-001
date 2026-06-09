@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/kraionyx/fhir-adapter/internal/config"
-	"github.com/kraionyx/fhir-adapter/internal/kafka"
-	"github.com/kraionyx/shared/pkg/secrets"
-	"github.com/kraionyx/shared/pkg/telemetry"
+	"github.com/svaani/fhir-adapter/internal/config"
+	"github.com/svaani/fhir-adapter/internal/kafka"
+	"github.com/svaani/shared/pkg/secrets"
+	"github.com/svaani/shared/pkg/telemetry"
 )
 
 func main() {

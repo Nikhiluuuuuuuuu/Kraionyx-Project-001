@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-api-gateway
+  name: {{ include "svaani.fullname" . }}-api-gateway
   labels:
     app.kubernetes.io/name: api-gateway
     app.kubernetes.io/instance: {{ .Release.Name }}

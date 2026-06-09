@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-clinical-nlp
+  name: {{ include "svaani.fullname" . }}-clinical-nlp
   labels:
     app.kubernetes.io/name: clinical-nlp
     app.kubernetes.io/instance: {{ .Release.Name }}

@@ -9,28 +9,28 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
-	"github.com/kraionyx/shared/pkg/crypto"
-	"github.com/kraionyx/shared/pkg/models"
+	"github.com/svaani/shared/pkg/crypto"
+	"github.com/svaani/shared/pkg/models"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
 	wsActiveSessions = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "kraionyx_ws_active_sessions",
+		Name: "svaani_ws_active_sessions",
 		Help: "The total number of active WebSocket sessions",
 	})
 	wsEncryptionErrors = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "kraionyx_ws_encryption_errors_total",
+		Name: "svaani_ws_encryption_errors_total",
 		Help: "The total number of encryption errors during audio processing",
 	})
 	wsChunksProcessed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "kraionyx_ws_chunks_processed_total",
+		Name: "svaani_ws_chunks_processed_total",
 		Help: "The total number of audio chunks successfully processed",
 	})
 
-	"github.com/kraionyx/api-gateway/internal/kafka"
-	"github.com/kraionyx/api-gateway/internal/session"
+	"github.com/svaani/api-gateway/internal/kafka"
+	"github.com/svaani/api-gateway/internal/session"
 )
 
 const (

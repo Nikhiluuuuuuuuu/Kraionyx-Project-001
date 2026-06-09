@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kraionyx/fhir-adapter/internal/fhir"
+	"github.com/svaani/fhir-adapter/internal/fhir"
 )
 
 func TestCreateDocumentReferenceWithBackoff(t *testing.T) {

@@ -12,11 +12,17 @@ func RateLimitMiddleware() fiber.Handler {
 		Max:        100,             // max 100 requests
 		Expiration: 1 * time.Minute, // per minute
 		KeyGenerator: func(c *fiber.Ctx) string {
+			if tenantID := c.Locals("tenant_id"); tenantID != nil {
+				return tenantID.(string)
+			}
+			if userID := c.Locals("user_id"); userID != nil {
+				return userID.(string)
+			}
 			return c.IP()
 		},
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error": "too many requests",
+				"error": "too many requests, quota exceeded",
 			})
 		},
 	})

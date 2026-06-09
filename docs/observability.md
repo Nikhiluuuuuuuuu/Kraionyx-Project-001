@@ -1,6 +1,6 @@
 # Observability & Tracing
 
-This document covers the observability stack used in the Kraionyx platform, providing insights into distributed tracing, metrics collection, and logging.
+This document covers the observability stack used in the Svaani platform, providing insights into distributed tracing, metrics collection, and logging.
 
 ## Stack Overview
 

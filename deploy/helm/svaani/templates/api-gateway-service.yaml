@@ -1,17 +1,17 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-clinical-nlp
+  name: {{ include "svaani.fullname" . }}-api-gateway
   labels:
-    app.kubernetes.io/name: clinical-nlp
+    app.kubernetes.io/name: api-gateway
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  type: {{ .Values.clinicalNlp.service.type }}
+  type: {{ .Values.apiGateway.service.type }}
   ports:
-    - port: {{ .Values.clinicalNlp.service.port }}
+    - port: {{ .Values.apiGateway.service.port }}
       targetPort: http
       protocol: TCP
       name: http
   selector:
-    app.kubernetes.io/name: clinical-nlp
+    app.kubernetes.io/name: api-gateway
     app.kubernetes.io/instance: {{ .Release.Name }}

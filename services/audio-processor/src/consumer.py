@@ -13,7 +13,7 @@ from typing import Callable
 
 from confluent_kafka import Consumer, KafkaError, KafkaException, Message
 
-from kraionyx_common.models import AudioChunkMessage
+from svaani_common.models import AudioChunkMessage
 
 from .config import Config
 

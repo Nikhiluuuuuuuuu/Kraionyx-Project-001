@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Kraionyx - Kafka Topic Creation Script
+# Svaani - Kafka Topic Creation Script
 # =============================================================================
 # Idempotent: safe to run multiple times. Existing topics are skipped.
 #
@@ -76,7 +76,7 @@ create_topic() {
 main() {
     echo ""
     echo "============================================"
-    echo "  Kraionyx — Kafka Topic Provisioning"
+    echo "  Svaani — Kafka Topic Provisioning"
     echo "============================================"
     echo ""
 

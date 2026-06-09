@@ -1,5 +1,5 @@
 # =============================================================================
-# Kraionyx - Medical STT & EHR Integration System
+# Svaani - Medical STT & EHR Integration System
 # =============================================================================
 # Usage: make help
 # =============================================================================
@@ -22,7 +22,7 @@ PYTHON_SERVICES := services/audio-processor services/stt-engine services/clinica
 .PHONY: help
 help: ## Show this help message
 	@echo ""
-	@echo "  Kraionyx — Medical STT & EHR Integration System"
+	@echo "  Svaani — Medical STT & EHR Integration System"
 	@echo "  ================================================"
 	@echo ""
 	@echo "  Usage: make <target>"
@@ -192,7 +192,7 @@ proto: ## Generate Go code from protobuf definitions
 		--proto_path=proto \
 		--go_out=shared/gen --go_opt=paths=source_relative \
 		--go-grpc_out=shared/gen --go-grpc_opt=paths=source_relative \
-		proto/kraionyx/v1/*.proto
+		proto/svaani/v1/*.proto
 	@echo "Protobuf generation complete."
 
 # ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ setup: certs infra-up ## First-time setup: generate certs, start infra, create t
 	@$(MAKE) topics
 	@echo ""
 	@echo "============================================"
-	@echo "  Kraionyx setup complete!"
+	@echo "  Svaani setup complete!"
 	@echo "============================================"
 	@echo ""
 	@echo "  Next steps:"

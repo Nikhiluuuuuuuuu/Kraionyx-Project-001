@@ -1,16 +1,16 @@
 # Architecture Decision Records
 
-This document captures the key architectural decisions made for the Kraionyx medical STT & EHR integration system, including context, rationale, and trade-offs.
+This document captures the key architectural decisions made for the Svaani medical STT & EHR integration system, including context, rationale, and trade-offs.
 
 ## High-Level System Overview
 
 ```mermaid
 C4Context
-    title Kraionyx Platform Architecture Overview
+    title Svaani Platform Architecture Overview
     
     Person(practitioner, "Medical Practitioner", "Doctor or Nurse dictating clinical notes")
     
-    System_Boundary(c1, "Kraionyx Platform") {
+    System_Boundary(c1, "Svaani Platform") {
         System(api_gw, "API Gateway", "Go, WebSocket, TLS 1.3", "Ingests audio, handles auth, streams results")
         SystemDb(kafka, "Apache Kafka", "KRaft Mode", "Event backbone for asynchronous processing")
         SystemDb(redis, "Redis", "Redis Streams", "Low-latency audio chunk buffering")
@@ -51,7 +51,7 @@ C4Context
 
 ### Context
 
-Kraionyx requires both high-performance network services (WebSocket ingestion, FHIR API integration) and GPU-accelerated ML inference (speech recognition, speaker diarization, clinical NLP). No single language excels at both.
+Svaani requires both high-performance network services (WebSocket ingestion, FHIR API integration) and GPU-accelerated ML inference (speech recognition, speaker diarization, clinical NLP). No single language excels at both.
 
 ### Decision
 
@@ -413,7 +413,7 @@ Enforce **mTLS (Mutual TLS)** across all internal service communications, manage
 
 ### Context
 
-As Kraionyx is deployed across varied hospital networks, we need an identity provider capable of federating with hospital Active Directories (LDAP, SAML, OIDC) while providing granular RBAC (Role-Based Access Control).
+As Svaani is deployed across varied hospital networks, we need an identity provider capable of federating with hospital Active Directories (LDAP, SAML, OIDC) while providing granular RBAC (Role-Based Access Control).
 
 ### Decision
 

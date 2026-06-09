@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-fhir-adapter
+  name: {{ include "svaani.fullname" . }}-fhir-adapter
   labels:
     app.kubernetes.io/name: fhir-adapter
     app.kubernetes.io/instance: {{ .Release.Name }}

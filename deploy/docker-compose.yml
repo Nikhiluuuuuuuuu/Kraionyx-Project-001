@@ -1,5 +1,5 @@
 # =============================================================================
-# Kraionyx - Full Development Stack
+# Svaani - Full Development Stack
 # HIPAA-Compliant Medical STT & EHR Integration System
 # =============================================================================
 # Usage:
@@ -13,7 +13,7 @@ x-common-env: &common-env
   KAFKA_BROKERS: kafka-broker:9092
   REDIS_URL: redis://:${REDIS_PASSWORD:-change_me_in_production}@redis:6379/0
   REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me_in_production}
-  POSTGRES_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/kraionyx?sslmode=disable
+  POSTGRES_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/svaani?sslmode=disable
   ENCRYPTION_KEY: ${ENCRYPTION_KEY:-generate-a-32-byte-base64-key-here}
 
 x-common-healthcheck: &common-healthcheck
@@ -36,7 +36,7 @@ services:
 
   kafka-broker:
     image: apache/kafka:3.7
-    container_name: kraionyx-kafka
+    container_name: svaani-kafka
     hostname: kafka-broker
     ports:
       - "9092:9092"
@@ -53,7 +53,7 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       # Cluster
-      CLUSTER_ID: kraionyx-kafka-cluster-001
+      CLUSTER_ID: svaani-kafka-cluster-001
       # Topic defaults
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -75,7 +75,7 @@ services:
 
   redis:
     image: redis:7.2-alpine
-    container_name: kraionyx-redis
+    container_name: svaani-redis
     hostname: redis
     ports:
       - "6379:6379"
@@ -100,14 +100,14 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: kraionyx-postgres
+    container_name: svaani-postgres
     hostname: postgres
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: kraionyx
+      POSTGRES_DB: svaani
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
@@ -120,11 +120,11 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
-    container_name: kraionyx-kafka-ui
+    container_name: svaani-kafka-ui
     ports:
       - "8080:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: kraionyx-dev
+      KAFKA_CLUSTERS_0_NAME: svaani-dev
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-broker:9092
       DYNAMIC_CONFIG_ENABLED: "true"
     depends_on:
@@ -146,7 +146,7 @@ services:
     build:
       context: ../services/api-gateway
       dockerfile: Dockerfile
-    container_name: kraionyx-api-gateway
+    container_name: svaani-api-gateway
     hostname: api-gateway
     ports:
       - "${API_GATEWAY_PORT:-8443}:8443"
@@ -184,7 +184,7 @@ services:
     build:
       context: ../services/audio-processor
       dockerfile: Dockerfile.gpu
-    container_name: kraionyx-audio-processor
+    container_name: svaani-audio-processor
     hostname: audio-processor
     environment:
       <<: *common-env
@@ -216,7 +216,7 @@ services:
     build:
       context: ../services/stt-engine
       dockerfile: Dockerfile.gpu
-    container_name: kraionyx-stt-engine
+    container_name: svaani-stt-engine
     hostname: stt-engine
     environment:
       <<: *common-env
@@ -249,7 +249,7 @@ services:
     build:
       context: ../services/clinical-nlp
       dockerfile: Dockerfile.gpu
-    container_name: kraionyx-clinical-nlp
+    container_name: svaani-clinical-nlp
     hostname: clinical-nlp
     environment:
       <<: *common-env
@@ -278,7 +278,7 @@ services:
     build:
       context: ../services/fhir-adapter
       dockerfile: Dockerfile
-    container_name: kraionyx-fhir-adapter
+    container_name: svaani-fhir-adapter
     hostname: fhir-adapter
     environment:
       <<: *common-env
@@ -307,10 +307,10 @@ services:
 networks:
   frontend:
     driver: bridge
-    name: kraionyx-frontend
+    name: svaani-frontend
   backend:
     driver: bridge
-    name: kraionyx-backend
+    name: svaani-backend
     internal: true
 
 # =============================================================================
@@ -319,10 +319,10 @@ networks:
 volumes:
   kafka-data:
     driver: local
-    name: kraionyx-kafka-data
+    name: svaani-kafka-data
   redis-data:
     driver: local
-    name: kraionyx-redis-data
+    name: svaani-redis-data
   postgres-data:
     driver: local
-    name: kraionyx-postgres-data
+    name: svaani-postgres-data

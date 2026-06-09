@@ -3,7 +3,7 @@ package middleware
 import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
-	"github.com/kraionyx/shared/pkg/audit"
+	"github.com/svaani/shared/pkg/audit"
 )
 
 func AuditMiddleware(logger *audit.Logger) fiber.Handler {

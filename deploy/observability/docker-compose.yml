@@ -3,7 +3,7 @@ version: '3.8'
 services:
   prometheus:
     image: prom/prometheus:v2.51.0
-    container_name: kraionyx-prometheus
+    container_name: svaani-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -18,7 +18,7 @@ services:
 
   grafana:
     image: grafana/grafana:10.4.0
-    container_name: kraionyx-grafana
+    container_name: svaani-grafana
     ports:
       - "3000:3000"
     environment:
@@ -34,7 +34,7 @@ services:
 
   jaeger:
     image: jaegertracing/all-in-one:1.55
-    container_name: kraionyx-jaeger
+    container_name: svaani-jaeger
     ports:
       - "16686:16686"
     environment:
@@ -45,7 +45,7 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.98.0
-    container_name: kraionyx-otel-collector
+    container_name: svaani-otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ../otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
@@ -60,12 +60,12 @@ services:
 networks:
   backend:
     external: true
-    name: kraionyx-backend
+    name: svaani-backend
 
 volumes:
   prometheus-data:
     driver: local
-    name: kraionyx-prometheus-data
+    name: svaani-prometheus-data
   grafana-data:
     driver: local
-    name: kraionyx-grafana-data
+    name: svaani-grafana-data

@@ -1,5 +1,5 @@
 # =============================================================================
-# Kraionyx - Infrastructure-Only Stack
+# Svaani - Infrastructure-Only Stack
 # Use this for local development without building application containers.
 # =============================================================================
 # Usage:
@@ -18,7 +18,7 @@ services:
   # ---------------------------------------------------------------------------
   kafka-broker:
     image: apache/kafka:3.7
-    container_name: kraionyx-kafka
+    container_name: svaani-kafka
     hostname: kafka-broker
     ports:
       - "9092:9092"
@@ -32,7 +32,7 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      CLUSTER_ID: kraionyx-kafka-cluster-001
+      CLUSTER_ID: svaani-kafka-cluster-001
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -51,7 +51,7 @@ services:
   # ---------------------------------------------------------------------------
   redis:
     image: redis:7.2-alpine
-    container_name: kraionyx-redis
+    container_name: svaani-redis
     hostname: redis
     ports:
       - "6379:6379"
@@ -77,11 +77,11 @@ services:
   # ---------------------------------------------------------------------------
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
-    container_name: kraionyx-kafka-ui
+    container_name: svaani-kafka-ui
     ports:
       - "8080:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: kraionyx-dev
+      KAFKA_CLUSTERS_0_NAME: svaani-dev
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-broker:9092
       DYNAMIC_CONFIG_ENABLED: "true"
     depends_on:
@@ -98,7 +98,7 @@ services:
   # ---------------------------------------------------------------------------
   prometheus:
     image: prom/prometheus:v2.51.0
-    container_name: kraionyx-prometheus
+    container_name: svaani-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -114,7 +114,7 @@ services:
   # ---------------------------------------------------------------------------
   grafana:
     image: grafana/grafana:10.4.0
-    container_name: kraionyx-grafana
+    container_name: svaani-grafana
     ports:
       - "3000:3000"
     environment:
@@ -131,7 +131,7 @@ services:
   # ---------------------------------------------------------------------------
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.98.0
-    container_name: kraionyx-otel-collector
+    container_name: svaani-otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
@@ -144,13 +144,13 @@ services:
 volumes:
   kafka-data:
     driver: local
-    name: kraionyx-kafka-data
+    name: svaani-kafka-data
   redis-data:
     driver: local
-    name: kraionyx-redis-data
+    name: svaani-redis-data
   prometheus-data:
     driver: local
-    name: kraionyx-prometheus-data
+    name: svaani-prometheus-data
   grafana-data:
     driver: local
-    name: kraionyx-grafana-data
+    name: svaani-grafana-data

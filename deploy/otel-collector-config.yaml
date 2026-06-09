@@ -12,7 +12,7 @@ processors:
 exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
-    namespace: kraionyx
+    namespace: svaani
 
   logging:
     verbosity: detailed

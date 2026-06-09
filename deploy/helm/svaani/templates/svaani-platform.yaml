@@ -12,7 +12,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-api-gateway
+  name: {{ include "svaani.fullname" . }}-api-gateway
   labels:
     app: api-gateway
 spec:
@@ -26,10 +26,10 @@ spec:
         app: api-gateway
       annotations:
         vault.hashicorp.com/agent-inject: "true"
-        vault.hashicorp.com/role: "kraionyx-role"
-        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/api-gateway"
+        vault.hashicorp.com/role: "svaani-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/svaani/api-gateway"
         vault.hashicorp.com/agent-inject-template-config: |
-          {{`{{- with secret "secret/data/kraionyx/api-gateway" -}}`}}
+          {{`{{- with secret "secret/data/svaani/api-gateway" -}}`}}
           {{`{{ range $k, $v := .Data.data }}`}}
           export {{`{{ $k }}`}}={{`{{ $v }}`}}
           {{`{{ end }}`}}
@@ -52,7 +52,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-api-gateway
+  name: {{ include "svaani.fullname" . }}-api-gateway
   labels:
     app: api-gateway
 spec:
@@ -70,7 +70,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-fhir-adapter
+  name: {{ include "svaani.fullname" . }}-fhir-adapter
   labels:
     app: fhir-adapter
 spec:
@@ -84,10 +84,10 @@ spec:
         app: fhir-adapter
       annotations:
         vault.hashicorp.com/agent-inject: "true"
-        vault.hashicorp.com/role: "kraionyx-role"
-        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/fhir-adapter"
+        vault.hashicorp.com/role: "svaani-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/svaani/fhir-adapter"
         vault.hashicorp.com/agent-inject-template-config: |
-          {{`{{- with secret "secret/data/kraionyx/fhir-adapter" -}}`}}
+          {{`{{- with secret "secret/data/svaani/fhir-adapter" -}}`}}
           {{`{{ range $k, $v := .Data.data }}`}}
           export {{`{{ $k }}`}}={{`{{ $v }}`}}
           {{`{{ end }}`}}
@@ -110,7 +110,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-fhir-adapter
+  name: {{ include "svaani.fullname" . }}-fhir-adapter
   labels:
     app: fhir-adapter
 spec:
@@ -128,7 +128,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-clinical-nlp
+  name: {{ include "svaani.fullname" . }}-clinical-nlp
   labels:
     app: clinical-nlp
 spec:
@@ -142,10 +142,10 @@ spec:
         app: clinical-nlp
       annotations:
         vault.hashicorp.com/agent-inject: "true"
-        vault.hashicorp.com/role: "kraionyx-role"
-        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/clinical-nlp"
+        vault.hashicorp.com/role: "svaani-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/svaani/clinical-nlp"
         vault.hashicorp.com/agent-inject-template-config: |
-          {{`{{- with secret "secret/data/kraionyx/clinical-nlp" -}}`}}
+          {{`{{- with secret "secret/data/svaani/clinical-nlp" -}}`}}
           {{`{{ range $k, $v := .Data.data }}`}}
           export {{`{{ $k }}`}}={{`{{ $v }}`}}
           {{`{{ end }}`}}
@@ -168,7 +168,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-clinical-nlp
+  name: {{ include "svaani.fullname" . }}-clinical-nlp
   labels:
     app: clinical-nlp
 spec:
@@ -186,7 +186,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-stt-engine
+  name: {{ include "svaani.fullname" . }}-stt-engine
   labels:
     app: stt-engine
 spec:
@@ -200,10 +200,10 @@ spec:
         app: stt-engine
       annotations:
         vault.hashicorp.com/agent-inject: "true"
-        vault.hashicorp.com/role: "kraionyx-role"
-        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/stt-engine"
+        vault.hashicorp.com/role: "svaani-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/svaani/stt-engine"
         vault.hashicorp.com/agent-inject-template-config: |
-          {{`{{- with secret "secret/data/kraionyx/stt-engine" -}}`}}
+          {{`{{- with secret "secret/data/svaani/stt-engine" -}}`}}
           {{`{{ range $k, $v := .Data.data }}`}}
           export {{`{{ $k }}`}}={{`{{ $v }}`}}
           {{`{{ end }}`}}
@@ -226,7 +226,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-stt-engine
+  name: {{ include "svaani.fullname" . }}-stt-engine
   labels:
     app: stt-engine
 spec:
@@ -244,7 +244,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-audio-processor
+  name: {{ include "svaani.fullname" . }}-audio-processor
   labels:
     app: audio-processor
 spec:
@@ -258,10 +258,10 @@ spec:
         app: audio-processor
       annotations:
         vault.hashicorp.com/agent-inject: "true"
-        vault.hashicorp.com/role: "kraionyx-role"
-        vault.hashicorp.com/agent-inject-secret-config: "secret/data/kraionyx/audio-processor"
+        vault.hashicorp.com/role: "svaani-role"
+        vault.hashicorp.com/agent-inject-secret-config: "secret/data/svaani/audio-processor"
         vault.hashicorp.com/agent-inject-template-config: |
-          {{`{{- with secret "secret/data/kraionyx/audio-processor" -}}`}}
+          {{`{{- with secret "secret/data/svaani/audio-processor" -}}`}}
           {{`{{ range $k, $v := .Data.data }}`}}
           export {{`{{ $k }}`}}={{`{{ $v }}`}}
           {{`{{ end }}`}}
@@ -284,7 +284,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-audio-processor
+  name: {{ include "svaani.fullname" . }}-audio-processor
   labels:
     app: audio-processor
 spec:

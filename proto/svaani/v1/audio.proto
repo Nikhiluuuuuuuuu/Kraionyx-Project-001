@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package kraionyx.v1;
+package svaani.v1;
 
-option go_package = "github.com/kraionyx/shared/gen/kraionyx/v1;kraionyxv1";
+option go_package = "github.com/svaani/shared/gen/svaani/v1;svaaniv1";
 
 // =============================================================================
 // AudioChunk — Represents a single encrypted audio fragment from a session.

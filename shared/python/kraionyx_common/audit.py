@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
-from kraionyx_common.models import AuditEvent
+from svaani_common.models import AuditEvent
 
 logger = logging.getLogger(__name__)
 

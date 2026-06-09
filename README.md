@@ -1,4 +1,4 @@
-# Kraionyx Platform
+# Svaani Platform
 
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-blue.svg)](LICENSE)
 [![Compliance: HIPAA](https://img.shields.io/badge/Compliance-HIPAA-green.svg)](docs/security.md)
@@ -7,7 +7,7 @@
 
 **Enterprise-Grade, HIPAA-Compliant Medical Speech-to-Text & EHR Integration Platform**
 
-Kraionyx is a state-of-the-art, real-time clinical documentation system designed for modern healthcare environments. It captures doctor–patient conversations with high-fidelity, performs multi-speaker diarization, generates structured SOAP notes using specialized medical AI models, and pushes the final records seamlessly to Electronic Health Record (EHR) systems via the FHIR R4 standard. 
+Svaani is a state-of-the-art, real-time clinical documentation system designed for modern healthcare environments. It captures doctor–patient conversations with high-fidelity, performs multi-speaker diarization, generates structured SOAP notes using specialized medical AI models, and pushes the final records seamlessly to Electronic Health Record (EHR) systems via the FHIR R4 standard. 
 
 Engineered for extreme reliability, the platform targets Tier-1 Production standards, processing heavy workloads via a distributed microservices architecture. It features full CI/CD pipelines with comprehensive security scanning, Kubernetes Helm charts for scalable orchestration, enterprise-grade Keycloak RBAC, HashiCorp Vault for secrets management, and strict zero-trust mTLS enforcement across all internal communications, all while enforcing strict zero-retention policies.
 
@@ -130,8 +130,8 @@ graph TB
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/kraionyx/kraionyx.git
-cd kraionyx
+git clone https://github.com/svaani/svaani.git
+cd svaani
 
 # 2. Configure environment
 cp .env.example .env
@@ -165,7 +165,7 @@ redis-cli -a "${REDIS_PASSWORD}" ping
 ## Project Structure
 
 ```
-kraionyx/
+svaani/
 ├── .github/                        # GitHub Actions CI/CD & Security Scanning
 ├── certs/                          # TLS certificates (gitignored except .gitkeep)
 ├── deploy/
@@ -180,7 +180,7 @@ kraionyx/
 │   ├── kubernetes.md               # Kubernetes deployment & Helm guide
 │   └── observability.md            # Distributed tracing & metrics guide
 ├── proto/
-│   └── kraionyx/v1/
+│   └── svaani/v1/
 │       ├── audio.proto             # Audio ingestion message definitions
 │       ├── transcription.proto     # Transcription & SOAP note definitions
 │       └── fhir.proto              # FHIR push request/response definitions
@@ -245,11 +245,11 @@ python -m stt_engine.main
 ### Protobuf Workflow
 
 ```bash
-# Edit proto files in proto/kraionyx/v1/
+# Edit proto files in proto/svaani/v1/
 # Then regenerate Go code:
 make proto
 
-# Generated code appears in shared/gen/kraionyx/v1/
+# Generated code appears in shared/gen/svaani/v1/
 ```
 
 ---

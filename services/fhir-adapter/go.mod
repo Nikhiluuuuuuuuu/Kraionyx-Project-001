@@ -1,11 +1,11 @@
-module github.com/kraionyx/fhir-adapter
+module github.com/svaani/fhir-adapter
 
 go 1.25.0
 
-replace github.com/kraionyx/shared => ../../shared/go
+replace github.com/svaani/shared => ../../shared/go
 
 require (
-	github.com/kraionyx/shared v0.0.0-00010101000000-000000000000
+	github.com/svaani/shared v0.0.0-00010101000000-000000000000
 	github.com/twmb/franz-go v1.18.1
 	golang.org/x/oauth2 v0.36.0
 )

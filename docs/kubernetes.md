@@ -1,10 +1,10 @@
 # Kubernetes & Helm Deployment
 
-This document outlines the deployment strategy for the Kraionyx platform on Kubernetes, utilizing Helm, Istio for mTLS, and HashiCorp Vault for secrets management and sidecar injection.
+This document outlines the deployment strategy for the Svaani platform on Kubernetes, utilizing Helm, Istio for mTLS, and HashiCorp Vault for secrets management and sidecar injection.
 
 ## Overview
 
-The Kraionyx platform uses a microservices architecture deployed via Helm charts. The deployment is designed to be highly available, secure, and observable.
+The Svaani platform uses a microservices architecture deployed via Helm charts. The deployment is designed to be highly available, secure, and observable.
 
 **Key Components:**
 - **Helm Charts**: Located in `deploy/helm/`, providing templated Kubernetes manifests for all services.
@@ -23,7 +23,7 @@ The Kraionyx platform uses a microservices architecture deployed via Helm charts
 
 ```
 deploy/helm/
-├── kraionyx/
+├── svaani/
 │   ├── Chart.yaml
 │   ├── values.yaml
 │   ├── charts/
@@ -43,11 +43,11 @@ Ensure Vault is running and the Kubernetes auth method is enabled. The Vault Age
 
 ### 2. Install Istio
 
-Ensure the `istio-injection=enabled` label is present on the namespace where Kraionyx will be deployed.
+Ensure the `istio-injection=enabled` label is present on the namespace where Svaani will be deployed.
 
 ```bash
-kubectl create namespace kraionyx-prod
-kubectl label namespace kraionyx-prod istio-injection=enabled
+kubectl create namespace svaani-prod
+kubectl label namespace svaani-prod istio-injection=enabled
 ```
 
 ### 3. Deploy using Helm
@@ -55,9 +55,9 @@ kubectl label namespace kraionyx-prod istio-injection=enabled
 Customize the `values.yaml` file according to your environment. Specifically, update Vault addresses, image tags, and resource limits.
 
 ```bash
-helm upgrade --install kraionyx ./deploy/helm/kraionyx \
-  --namespace kraionyx-prod \
-  -f ./deploy/helm/kraionyx/values-prod.yaml
+helm upgrade --install svaani ./deploy/helm/svaani \
+  --namespace svaani-prod \
+  -f ./deploy/helm/svaani/values-prod.yaml
 ```
 
 ### 4. Verify Deployment
@@ -65,7 +65,7 @@ helm upgrade --install kraionyx ./deploy/helm/kraionyx \
 Check the status of the pods and ensure all containers (including Istio proxy and Vault sidecars) are running.
 
 ```bash
-kubectl get pods -n kraionyx-prod
+kubectl get pods -n svaani-prod
 ```
 
 ## Security Posture

@@ -1,8 +1,8 @@
-module github.com/kraionyx/api-gateway
+module github.com/svaani/api-gateway
 
 go 1.25.0
 
-replace github.com/kraionyx/shared => ../../shared/go
+replace github.com/svaani/shared => ../../shared/go
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.17.0
@@ -10,7 +10,7 @@ require (
 	github.com/gofiber/contrib/websocket v1.3.4
 	github.com/gofiber/fiber/v2 v2.52.12
 	github.com/google/uuid v1.6.0
-	github.com/kraionyx/shared v0.0.0-00010101000000-000000000000
+	github.com/svaani/shared v0.0.0-00010101000000-000000000000
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redis/go-redis/v9 v9.20.0
 	github.com/twmb/franz-go v1.21.3

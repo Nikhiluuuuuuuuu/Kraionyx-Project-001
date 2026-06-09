@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kraionyx.fullname" . }}-audio-processor
+  name: {{ include "svaani.fullname" . }}-audio-processor
   labels:
     app.kubernetes.io/name: audio-processor
     app.kubernetes.io/instance: {{ .Release.Name }}

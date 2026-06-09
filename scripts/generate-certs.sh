@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Kraionyx - TLS Development Certificate Generator
+# Svaani - TLS Development Certificate Generator
 # =============================================================================
 # Generates self-signed TLS certificates for local development using mkcert.
 # Idempotent: re-running overwrites existing certs (safe for dev).
@@ -54,7 +54,7 @@ check_prerequisites() {
 main() {
     echo ""
     echo "============================================"
-    echo "  Kraionyx — TLS Certificate Generator"
+    echo "  Svaani — TLS Certificate Generator"
     echo "============================================"
     echo ""
 
