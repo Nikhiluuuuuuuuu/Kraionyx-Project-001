@@ -1,4 +1,4 @@
-// Package models defines shared Kafka message schemas for the Kraionyx
+// Package models defines shared Kafka message schemas for the Svaani
 // medical STT and EHR integration pipeline. These types are used across
 // all microservices for serialization and deserialization of messages
 // flowing through the Kafka topic topology.
@@ -130,6 +130,8 @@ type AuditEvent struct {
 	EventID string `json:"event_id"`
 	// Timestamp is the ISO 8601 timestamp of the event.
 	Timestamp string `json:"timestamp"`
+	// TenantID identifies the tenant to which the action belongs.
+	TenantID string `json:"tenant_id"`
 	// UserID identifies the user or service that performed the action.
 	UserID string `json:"user_id"`
 	// Action describes what was done (e.g., "READ", "CREATE", "UPDATE", "DELETE", "LOGIN").

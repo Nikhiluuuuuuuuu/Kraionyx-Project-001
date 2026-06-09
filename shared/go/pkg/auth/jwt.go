@@ -8,6 +8,10 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 )
 
+type ContextKey string
+
+const TenantIDKey ContextKey = "tenant_id"
+
 type OIDCValidator struct {
 	provider *oidc.Provider
 	verifier *oidc.IDTokenVerifier
