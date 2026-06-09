@@ -1,16 +1,18 @@
 import os
 import chromadb
 from sentence_transformers import SentenceTransformer
-import logging
+import structlog
 import hashlib
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 class PatientHistoryDB:
     """
     Vector Database for Patient History using ChromaDB and BAAI/bge-m3 embeddings.
     """
-    def __init__(self, persist_directory="./chroma_db"):
+    def __init__(self, persist_directory=None):
+        if persist_directory is None:
+            persist_directory = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
         self.client = chromadb.PersistentClient(path=persist_directory)
         self.collection = self.client.get_or_create_collection(name="patient_history")
         

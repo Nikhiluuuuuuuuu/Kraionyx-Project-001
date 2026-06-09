@@ -24,6 +24,7 @@ import (
 	"github.com/svaani/shared/pkg/secrets"
 	"github.com/svaani/shared/pkg/telemetry"
 	"github.com/redis/go-redis/v9"
+	redis_store "github.com/gofiber/storage/redis/v3"
 	_ "github.com/lib/pq"
 )
 
@@ -95,9 +96,15 @@ func main() {
 	prom.RegisterAt(app, "/metrics")
 	app.Use(prom.Middleware)
 
+	rateLimitStore := redis_store.New(redis_store.Config{
+		Addrs:     []string{cfg.RedisURL},
+		Password:  cfg.RedisPassword,
+		TLSConfig: tlsConfig,
+	})
+
 	app.Use(otelfiber.Middleware())
 	app.Use(middleware.AuditMiddleware(auditLogger))
-	app.Use(middleware.RateLimitMiddleware())
+	app.Use(middleware.RateLimitMiddleware(rateLimitStore))
 
 	app.Get("/health", handler.HealthCheck)
 	app.Get("/health/ready", handler.ReadyCheck)

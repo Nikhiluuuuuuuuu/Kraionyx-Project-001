@@ -1,13 +1,14 @@
 import json
-import logging
+import structlog
 import re
 from typing import List, Optional
 from pydantic import BaseModel, Field, ValidationError
+from tenacity import RetryError
 
 from src.llm import LLMBackend
 from src.vector_db import PatientHistoryDB
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 class ExtractedData(BaseModel):
     symptoms: List[str] = Field(default_factory=list)
@@ -81,8 +82,8 @@ class VerifierAgent:
             return {"status": "ERROR", "reason": f"Could not parse verifier response: {response}"}
 
 class ClinicalWorkflow:
-    def __init__(self, use_mock_llm=False, model_name="sarvam-1"):
-        self.llm = LLMBackend(use_mock=use_mock_llm, model_name=model_name)
+    def __init__(self, model_name="sarvam-1"):
+        self.llm = LLMBackend(model_name=model_name)
         self.vector_db = PatientHistoryDB()
         self.extractor = ExtractorAgent(self.llm)
         self.synthesizer = SynthesizerAgent(self.llm, self.vector_db)
@@ -91,14 +92,21 @@ class ClinicalWorkflow:
     def process_transcript(self, patient_id: str, transcript: str) -> dict:
         logger.info(f"Processing transcript for patient {patient_id}")
         
-        extracted = self.extractor.extract(transcript)
-        logger.info("Extraction complete")
-        
-        soap_note = self.synthesizer.synthesize(patient_id, transcript, extracted)
-        logger.info("Synthesis complete")
-        
-        verification = self.verifier.verify(transcript, soap_note)
-        logger.info(f"Verification complete: {verification.get('status')}")
+        try:
+            extracted = self.extractor.extract(transcript)
+            logger.info("Extraction complete")
+            
+            soap_note = self.synthesizer.synthesize(patient_id, transcript, extracted)
+            logger.info("Synthesis complete")
+            
+            verification = self.verifier.verify(transcript, soap_note)
+            logger.info(f"Verification complete: {verification.get('status')}")
+        except RetryError as e:
+            logger.error(f"LLM API generation failed after retries: {e}")
+            return {
+                "status": "ESCALATION_REQUIRED",
+                "reason": "LLM API generation failed after retries."
+            }
         
         if verification.get("status") == "REJECTED":
             logger.warning(f"SOAP note rejected due to hallucination: {verification.get('reason')}")

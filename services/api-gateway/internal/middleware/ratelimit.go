@@ -7,10 +7,11 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 )
 
-func RateLimitMiddleware() fiber.Handler {
+func RateLimitMiddleware(store fiber.Storage) fiber.Handler {
 	return limiter.New(limiter.Config{
 		Max:        100,             // max 100 requests
 		Expiration: 1 * time.Minute, // per minute
+		Storage:    store,
 		KeyGenerator: func(c *fiber.Ctx) string {
 			if tenantID := c.Locals("tenant_id"); tenantID != nil {
 				return tenantID.(string)
