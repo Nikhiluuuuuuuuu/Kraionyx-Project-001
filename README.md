@@ -187,6 +187,7 @@ svaani/
 ├── scripts/
 │   ├── create-kafka-topics.sh      # Kafka topic provisioning
 │   └── generate-certs.sh           # TLS certificate generation
+├── migrations/                     # SQL database migrations for persistent stores
 ├── services/
 │   ├── api-gateway/                # Go — WebSocket ingestion + REST API (100 msg/sec rate limit)
 │   ├── audio-processor/            # Python — 500ms chunking into 10s windows, O(1) hash map speaker roles, Pyannote
