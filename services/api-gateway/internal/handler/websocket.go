@@ -266,7 +266,7 @@ func (c *Client) handleTextMessage(msg []byte) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		hasConsent, err := c.handler.consentSvc.CheckAccess(ctx, ctrl.PatientID, "svaani-api", consent.ConsentTypeMedicalRecords)
+		hasConsent, err := c.handler.consentSvc.CheckConsent(ctx, ctrl.PatientID, "svaani-api", consent.ConsentTypeMedicalRecords)
 		if err != nil {
 			c.logger.Error("failed to verify consent", slog.String("error", err.Error()))
 			c.sendError("failed to verify patient consent")
