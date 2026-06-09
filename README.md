@@ -22,8 +22,8 @@ The platform has been upgraded to a 10/10 Tier-1 production level with the follo
 - **Advanced Observability**: Full OpenTelemetry distributed tracing and a Prometheus/Grafana stack located in `deploy/observability`.
 - **Kubernetes Orchestration**: Production-ready Helm charts (`deploy/helm/`) featuring Istio mTLS and dynamic HashiCorp Vault sidecar injection.
 - **Robust CI/CD & Security**: Automated GitHub Actions pipelines incorporating Trivy and gosec security scanning.
-- **Medical AI Benchmarking**: Comprehensive validation suites for WER (Word Error Rate) and Clinical Entity Evaluation integrated within `services/clinical-nlp` and `services/stt-engine`.
-- **Compliance & Privacy**: Dedicated Patient Consent Module (`shared/go/pkg/consent`) and automated Vault key rotation scripts for strict lifecycle management.
+- **Multi-Tenancy**: Tier 2 Schema Isolation. API Gateway extracts `tenant_id` from JWTs. Database connections dynamically set `search_path` to `tenant_<tenant_id>`.
+- **Compliance & Privacy**: Dedicated Patient Consent Module (`shared/go/pkg/consent`), automated Vault key rotation scripts, and Audit Logging requiring `tenant_id` and `user_id`.
 
 ---
 
@@ -46,8 +46,8 @@ graph TB
         REDIS["Redis 7<br/><i>Audio Buffer (mTLS)</i>"]
 
         AP["Audio Processor<br/><i>Python · Pyannote</i>"]
-        STT["STT Engine<br/><i>Whisper Large-V3</i>"]
-        NLP["Clinical NLP<br/><i>Llama-3.1 & BGE-m3</i>"]
+        STT["STT Engine<br/><i>Sarvam AI STT API</i>"]
+        NLP["Clinical NLP<br/><i>Sarvam AI Gen API</i>"]
         FHIR["FHIR Adapter<br/><i>Go · FHIR R4</i>"]
         
         VAULT["HashiCorp Vault<br/><i>Secrets & PKI</i>"]
@@ -91,8 +91,8 @@ graph TB
 |-------|-------------|---------|------------|
 | 1. Ingest | `audio.raw.chunks` | API Gateway | Go, WebSocket, TLS 1.3, 100 msg/sec limit |
 | 2. Preprocess | `audio.preprocessed` | Audio Processor | Python, pyannote (500ms chunks to 10s windows, O(1) role hash map) |
-| 3. Transcribe | `transcription.results` | STT Engine | Python, OpenAI Whisper Large-V3 w/ LoRA (IndicTrans2/IndicXlit) |
-| 4. Generate Notes | `clinical.notes.created` | Clinical NLP | Python, Multi-Agent (Llama-3.1-8B-Instruct/Sarvam-1), BGE-m3 + LRU Eviction |
+| 3. Transcribe | `transcription.results` | STT Engine | Python, Sarvam AI STT API |
+| 4. Generate Notes | `clinical.notes.created` | Clinical NLP | Python, Sarvam AI Text Generation API |
 | 5. Push to EHR | `fhir.outbound` | FHIR Adapter | Go, FHIR R4, Exp Backoff & DLQ |
 
 ---
@@ -105,24 +105,18 @@ graph TB
 | **Python** | 3.11+ | Audio Processor, STT Engine, Clinical NLP |
 | **Docker** | 24+ | Containerized deployment |
 | **Docker Compose** | v2.20+ | Service orchestration |
-| **CUDA Toolkit** | 12.x | GPU acceleration for ML models |
-| **NVIDIA Container Toolkit** | Latest | GPU passthrough to Docker |
 | **mkcert** | Latest | TLS certificate generation (dev) |
 | **protoc** | 3.x | Protobuf code generation |
 | **HashiCorp Vault** | 1.15+ | Secrets and dynamic certificate management |
 | **Keycloak** | 22+ | Identity, access management, and RBAC |
 | **Kubernetes / Helm** | 1.28+ | Production orchestration and deployment |
 
-### GPU Requirements
+### Infrastructure Requirements
 
-| Service | VRAM Required | Notes |
-|---------|--------------|-------|
-| Audio Processor (pyannote) | ~2 GB | Speaker diarization |
-| STT Engine (Whisper Large-V3 + LoRA) | ~12 GB | Speech recognition (Indic Support) |
-| Clinical NLP (Llama-3.1-8B-Instruct/Sarvam-1) | ~24 GB | SOAP note generation via RAG (BGE-m3) |
+The platform has been migrated to use CPU-bound microservices only (no `Dockerfile.gpu`). All AI processing relies on external Sarvam AI APIs.
 
-> **Minimum**: NVIDIA GPU with 24 GB VRAM (e.g., RTX 3090, RTX 4090)
-> **Recommended**: 48 GB VRAM (e.g., 2x RTX 4090, A6000, A40) for running all services concurrently.
+> **Minimum**: Standard multi-core CPU, 8 GB RAM for running all local microservices.
+> **Note**: An active internet connection and valid Sarvam AI API credentials are required.
 
 ---
 
@@ -190,8 +184,8 @@ svaani/
 ├── services/
 │   ├── api-gateway/                # Go — WebSocket ingestion + REST API (100 msg/sec rate limit)
 │   ├── audio-processor/            # Python — 500ms chunking into 10s windows, O(1) hash map speaker roles, Pyannote
-│   ├── stt-engine/                 # Python — Whisper Large-V3 (LoRA) + IndicTrans2/IndicXlit
-│   ├── clinical-nlp/               # Python — Llama-3.1-8B-Instruct/Sarvam-1 + BGE-m3 LRU Cache
+│   ├── stt-engine/                 # Python — Sarvam AI STT API Integration
+│   ├── clinical-nlp/               # Python — Sarvam AI Text Generation API Integration
 │   └── fhir-adapter/               # Go — FHIR R4 EHR integration (Backoff & DLQ)
 ├── shared/
 │   └── go/pkg/consent/             # Patient Consent Module & Vault Key Rotation
@@ -235,7 +229,7 @@ make infra-up
 cd services/api-gateway
 go run ./cmd/server
 
-# Run the STT Engine locally (requires Python + CUDA)
+# Run the STT Engine locally (requires Python)
 cd services/stt-engine
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
@@ -261,8 +255,8 @@ This system is designed for HIPAA and DPDPA compliance:
 - **Encryption at rest**: AES-256-GCM for all audio data and clinical notes
 - **Encryption in transit**: TLS 1.3 for all inter-service communication
 - **Zero retention**: Audio data is deleted after transcription; configurable retention
-- **PII redaction**: Microsoft Presidio (regex behavior) for automated PHI stripping
-- **Audit logging**: All data access events are published to `audit.events` Kafka topic
+- **PII redaction**: `pii_redactor.py` executes before any payload is sent to Sarvam APIs to ensure compliance
+- **Audit logging**: All data access events are published to `audit.events` Kafka topic. Requires `tenant_id` and `user_id`.
 - **Network segmentation**: Backend services are on an internal-only Docker network
 
 For full security documentation, see [docs/security.md](docs/security.md).
