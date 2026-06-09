@@ -18,6 +18,8 @@ All microservices (Go and Python) are instrumented with OpenTelemetry SDKs. Trac
 - **Go Services** (`api-gateway`, `fhir-adapter`): Use `go.opentelemetry.io/otel`.
 - **Python Services** (`audio-processor`, `stt-engine`, `clinical-nlp`): Use `opentelemetry-api` and `opentelemetry-sdk`.
 
+**Structured Logging**: All Python services output logs in JSON format via `structlog` and `python-json-logger`, ensuring seamless aggregation and trace-id correlation by Logstash or FluentBit.
+
 **Note:** Distributed traces now include `tenant_id` to provide tenant-specific performance isolation and monitoring.
 
 ## Metrics & Dashboards
