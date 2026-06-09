@@ -154,7 +154,7 @@ Svaani implements a zero-retention architecture for audio data:
 graph LR
     A["Audio Ingested"] -->|Encrypted| B["Redis Buffer<br/>TTL: 1 hour"]
     B -->|Decrypted for processing| C["Audio Processor"]
-    C -->|Preprocessed| D["STT Engine<br/>(Whisper Large-V3)"]
+    C -->|Preprocessed| D["STT Engine<br/>(Sarvam AI STT API)"]
     D -->|Transcript only| E["Clinical NLP<br/>(Agentic+RAG)"]
     E -->|SOAP Note| F["FHIR Adapter<br/>(w/ DLQ)"]
 
