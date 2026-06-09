@@ -262,7 +262,7 @@ This system is designed for HIPAA and DPDPA compliance:
 - **Encryption at rest**: AES-256-GCM for all audio data and clinical notes
 - **Encryption in transit**: TLS 1.3 for all inter-service communication
 - **Zero retention**: Audio data is deleted after transcription; configurable retention
-- **PII redaction**: Microsoft Presidio (regex behavior) for automated PHI stripping
+- **PII redaction**: Microsoft Presidio (NER & Anonymizer) for automated PHI stripping
 - **Audit logging**: All data access events are published to `audit.events` Kafka topic
 - **Network segmentation**: Backend services are on an internal-only Docker network
 

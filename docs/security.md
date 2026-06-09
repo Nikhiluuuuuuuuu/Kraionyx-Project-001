@@ -1,6 +1,6 @@
 # Security & Compliance Documentation
 
-This document defines the security controls, compliance requirements, and data protection policies for the Svaani medical STT & EHR integration platform.
+This document defines the security controls, compliance requirements, and data protection policies for the Kraionyx medical STT & EHR integration platform.
 
 > **Classification**: CONFIDENTIAL — Internal Use Only
 
@@ -19,16 +19,14 @@ graph TD
 
     subgraph "Trust Boundary 1: Perimeter (Frontend Network)"
         WAF["WAF & DDoS Protection"]
-        API["API Gateway<br/>(TLS Termination)"]
-        Keycloak["Keycloak<br/>(IAM & RBAC)"]
+        API["API Gateway<br/>(TLS Termination, Auth)"]
     end
 
-    subgraph "Trust Boundary 2: Processing (Backend Network / mTLS Enforced)"
+    subgraph "Trust Boundary 2: Processing (Backend Network)"
         Kafka["Kafka Event Bus<br/>(mTLS)"]
-        Redis["Redis Cache<br/>(mTLS + At Rest Encryption)"]
-        ML["ML Pipeline<br/>(mTLS Isolated)"]
-        FHIR["FHIR Adapter<br/>(mTLS)"]
-        Vault["HashiCorp Vault<br/>(Secrets & PKI)"]
+        Redis["Redis Cache<br/>(Data at Rest Encryption)"]
+        ML["ML Pipeline<br/>(Isolated from external access)"]
+        FHIR["FHIR Adapter"]
     end
     
     subgraph "Trust Boundary 3: Partner Network"
@@ -39,30 +37,28 @@ graph TD
     Attacker -.-> |"Threat: Credential Theft"| Internet
     Attacker -.-> |"Threat: Eavesdropping"| Internet
     WAF --> API
-    WAF --> Keycloak
-    API --> |"Validates JWT / mTLS"| Kafka
-    API --> |"mTLS"| Redis
-    API --> |"Fetches DB credentials via mTLS"| Vault
-    Kafka <--> |"mTLS"| ML
-    Kafka <--> |"mTLS"| FHIR
+    API --> |"Sanitized/Authenticated Traffic"| Kafka
+    API --> Redis
+    Kafka <--> ML
+    Kafka <--> FHIR
     FHIR --> |"TLS 1.2+"| EHR
     
     classDef threat fill:#fecaca,stroke:#dc2626,stroke-width:2px;
     classDef secure fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
     
     class Attacker threat;
-    class WAF,API,Kafka,Redis,ML,FHIR,Vault,Keycloak secure;
+    class WAF,API,Kafka,Redis,ML,FHIR secure;
 ```
 
 ---
 
 ## 2. Regulatory Compliance Matrix
 
-Svaani is designed to comply with the following regulations when deployed with proper organizational controls:
+Kraionyx is designed to comply with the following regulations when deployed with proper organizational controls:
 
 ### HIPAA (United States)
 
-| HIPAA Rule | Requirement | Svaani Control | Status |
+| HIPAA Rule | Requirement | Kraionyx Control | Status |
 |------------|-------------|------------------|--------|
 | §164.312(a)(1) | Access Control | API key + JWT authentication; RBAC per practitioner | ✅ Implemented |
 | §164.312(a)(2)(iv) | Encryption at Rest | AES-256-GCM for all PHI in Redis and Kafka | ✅ Implemented |
@@ -76,7 +72,7 @@ Svaani is designed to comply with the following regulations when deployed with p
 
 ### DPDPA (India — Digital Personal Data Protection Act, 2023)
 
-| Principle | Requirement | Svaani Control |
+| Principle | Requirement | Kraionyx Control |
 |-----------|-------------|------------------|
 | Lawful Purpose | Process data only for consented clinical purposes | Session-scoped; purpose-limited pipeline |
 | Data Minimization | Collect only necessary data | Audio deleted after transcription; minimal metadata |
@@ -94,8 +90,8 @@ Svaani is designed to comply with the following regulations when deployed with p
 | Component | Protocol | Minimum Version | Cipher Suites |
 |-----------|----------|----------------|---------------|
 | Client → API Gateway | TLS | 1.3 | TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256 |
-| API Gateway → Kafka | mTLS | 1.3 | Same as above |
-| Inter-service (Backend) | mTLS | 1.3 | Enforced via HashiCorp Vault PKI |
+| API Gateway → Kafka | PLAINTEXT (dev) / TLS (prod) | 1.3 | Same as above |
+| Inter-service (Docker) | Internal network | N/A | Network isolation (internal: true) |
 | FHIR Adapter → EHR | TLS | 1.2+ | Per EHR vendor requirements |
 
 **Production TLS Configuration (Go)**:
@@ -109,13 +105,6 @@ tlsConfig := &tls.Config{
     },
 }
 ```
-
-### 2.1.1 mTLS Enforcement Policy
-
-Svaani enforces strict **Zero-Trust mTLS** across all internal backend services:
-1. **Dynamic Certificates**: HashiCorp Vault acts as the internal Certificate Authority (CA). Services request short-lived mTLS certificates on boot.
-2. **Strict Verification**: Every service requires client certificates (`ClientAuth: tls.RequireAndVerifyClientCert`) for all inbound connections (e.g., Redis, Kafka, and any internal gRPC/HTTP endpoints).
-3. **No Fallback**: PLAINTEXT connections are rejected at the network and application layers in staging and production.
 
 ### 2.2 Encryption at Rest
 
@@ -148,13 +137,13 @@ Svaani enforces strict **Zero-Trust mTLS** across all internal backend services:
 
 ## 3. Zero-Retention Policy
 
-Svaani implements a zero-retention architecture for audio data:
+Kraionyx implements a zero-retention architecture for audio data:
 
 ```mermaid
 graph LR
     A["Audio Ingested"] -->|Encrypted| B["Redis Buffer<br/>TTL: 1 hour"]
     B -->|Decrypted for processing| C["Audio Processor"]
-    C -->|Preprocessed| D["STT Engine<br/>(Sarvam AI STT API)"]
+    C -->|Preprocessed| D["STT Engine<br/>(Whisper Large-V3)"]
     D -->|Transcript only| E["Clinical NLP<br/>(Agentic+RAG)"]
     E -->|SOAP Note| F["FHIR Adapter<br/>(w/ DLQ)"]
 
@@ -191,7 +180,7 @@ graph LR
 
 ### 4.1 Redaction Pipeline
 
-The `pii_redactor.py` script executes prior to any data transmission. It uses Microsoft Presidio (regex behavior) for automated PII/PHI redaction before any payload is sent to Sarvam APIs:
+The Extractor agent within the Clinical NLP service uses Microsoft Presidio (regex behavior) for automated PII/PHI redaction before producing clinical notes:
 
 | PHI Category | Detection Method | Redaction Action |
 |-------------|-----------------|------------------|
@@ -285,11 +274,10 @@ Master Key (ENCRYPTION_KEY)
 
 | Key | Rotation Frequency | Method |
 |-----|-------------------|--------|
-| Master Key (ENCRYPTION_KEY) | 90 days | Automated via HashiCorp Vault |
-| JWT_SECRET | 30 days | Keycloak automatic key rotation |
-| API_KEY | On demand | Vault dynamic secret generation / revocation |
+| Master Key (ENCRYPTION_KEY) | 90 days | Rolling update: decrypt with old, re-encrypt with new |
+| JWT_SECRET | 30 days | Token expiry handles transition |
+| API_KEY | On demand | Issue new key, revoke old |
 | TLS certificates | 90 days (dev), 1 year (prod) | Automated via cert-manager or ACME |
-| mTLS certificates | 24 hours | Vault PKI secret engine (dynamic) |
 | Session DEK | Per session | Automatically generated and destroyed |
 
 ### 6.3 Key Storage (Production)
@@ -297,7 +285,8 @@ Master Key (ENCRYPTION_KEY)
 | Environment | Key Storage | Notes |
 |------------|-------------|-------|
 | Development | `.env` file (gitignored) | Local only, never committed |
-| Staging / Prod | **HashiCorp Vault** | Encrypted at rest, tightly integrated via Kubernetes Service Accounts |
+| Staging | Docker Secrets / HashiCorp Vault | Encrypted at rest |
+| Production | AWS KMS / GCP KMS / Azure Key Vault | Hardware-backed, audited |
 
 ### 6.4 Emergency Key Revocation
 
@@ -315,12 +304,12 @@ Master Key (ENCRYPTION_KEY)
 
 ```mermaid
 graph TB
-    subgraph "Frontend Network (svaani-frontend)"
+    subgraph "Frontend Network (kraionyx-frontend)"
         CLIENT["External Client"]
         GW["API Gateway :8443"]
     end
 
-    subgraph "Backend Network (svaani-backend, internal)"
+    subgraph "Backend Network (kraionyx-backend, internal)"
         KAFKA["Kafka :9092"]
         REDIS["Redis :6379"]
         AP["Audio Processor"]
@@ -338,7 +327,7 @@ graph TB
 ```
 
 - **Frontend network**: Only the API Gateway is exposed to external traffic.
-- **Backend network**: Marked `internal: true` — outbound internet access restricted strictly to Sarvam API domains.
+- **Backend network**: Marked `internal: true` — no outbound internet access.
 - ML services, Kafka, and Redis cannot be reached from outside the Docker network.
 
 ### 7.2 Port Exposure
@@ -360,40 +349,26 @@ graph TB
 
 ## 8. Authentication & Authorization
 
-### 8.1 Client Authentication & IAM
-
-Authentication is delegated to **Keycloak**, which provides enterprise-grade Identity and Access Management (IAM):
+### 8.1 Client Authentication
 
 ```
-Client → Keycloak: Authenticate (OAuth2 / OIDC)
-Keycloak → Client: Return signed JWT
 Client → API Gateway:
-  Option A: Bearer Token   → Authorization: Bearer <jwt_token>
+  Option A: HTTP Header    → X-API-Key: <api_key>
+  Option B: Query Param    → ?api_key=<api_key>
+  Option C: Bearer Token   → Authorization: Bearer <jwt_token>
 ```
-*Note: API keys for programmatic access are issued and rotated via HashiCorp Vault.*
 
-### 8.2 Enterprise RBAC (Role-Based Access Control)
-
-Keycloak enforces fine-grained RBAC mapping to hospital AD groups. Example roles include:
-- `svaani_practitioner`: Can record audio, view own sessions, and edit own drafts.
-- `svaani_reviewer`: Can review and finalize SOAP notes for a specific department.
-- `svaani_admin`: System configuration and audit log access.
-
-### 8.3 JWT Token Structure
-
-Tokens generated by Keycloak include these roles:
+### 8.2 JWT Token Structure
 
 ```json
 {
   "sub": "practitioner_id",
-  "iss": "https://auth.svaani.io/realms/medical",
+  "iss": "kraionyx",
   "iat": 1702600000,
   "exp": 1702603600,
-  "realm_access": {
-    "roles": ["svaani_practitioner"]
-  },
+  "scope": ["audio:write", "session:read", "session:close"],
   "practitioner_id": "pract_abc123",
-  "tenant_id": "tenant_xyz789"
+  "organization_id": "org_xyz789"
 }
 ```
 
@@ -413,7 +388,7 @@ Tokens generated by Keycloak include these roles:
 ### 9.1 Data Breach Response Plan
 
 1. **Detection** (0-1 hour): Automated alerts from audit event anomalies.
-2. **Containment** (1-4 hours): Revoke compromised keys, isolate affected tenants (Tier 2 isolation allows isolating a single tenant without impacting the entire platform).
+2. **Containment** (1-4 hours): Revoke compromised keys, isolate affected services.
 3. **Assessment** (4-24 hours): Determine scope of PHI exposure via audit logs.
 4. **Notification** (within 72 hours): Notify affected individuals and regulators per HIPAA/DPDPA.
 5. **Remediation** (1-7 days): Patch vulnerability, rotate all keys, update access controls.
@@ -421,4 +396,4 @@ Tokens generated by Keycloak include these roles:
 
 ### 9.2 Security Contact
 
-Report security vulnerabilities to: **security@svaani.io** (PGP key available on request).
+Report security vulnerabilities to: **security@kraionyx.io** (PGP key available on request).

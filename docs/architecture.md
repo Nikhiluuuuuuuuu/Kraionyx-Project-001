@@ -1,44 +1,38 @@
 # Architecture Decision Records
 
-This document captures the key architectural decisions made for the Svaani medical STT & EHR integration system, including context, rationale, and trade-offs.
+This document captures the key architectural decisions made for the Kraionyx medical STT & EHR integration system, including context, rationale, and trade-offs.
 
 ## High-Level System Overview
 
 ```mermaid
 C4Context
-    title Svaani Platform Architecture Overview
+    title Kraionyx Platform Architecture Overview
     
     Person(practitioner, "Medical Practitioner", "Doctor or Nurse dictating clinical notes")
     
-    System_Boundary(c1, "Svaani Platform") {
+    System_Boundary(c1, "Kraionyx Platform") {
         System(api_gw, "API Gateway", "Go, WebSocket, TLS 1.3", "Ingests audio, handles auth, streams results")
         SystemDb(kafka, "Apache Kafka", "KRaft Mode", "Event backbone for asynchronous processing")
         SystemDb(redis, "Redis", "Redis Streams", "Low-latency audio chunk buffering")
         System(audio_proc, "Audio Processor", "Python, Pyannote", "500ms chunks -> 10s windows, O(1) hash map speaker roles")
         System(stt, "STT Engine", "Python, Whisper Large-V3", "High-performance transcription via LoRA + Indic Support")
-        System(nlp, "Clinical NLP", "Python, Sarvam API", "Extractor, Synthesizer, Verifier agents + ChromaDB (BGE-m3)")
+        System(nlp, "Clinical NLP", "Python, Llama-3.1/Sarvam-1", "Extractor, Synthesizer, Verifier agents + BGE-m3 LRU Eviction")
         System(fhir, "FHIR Adapter", "Go", "Formats and pushes records to EHR with Exp Backoff & DLQ")
-        
-        System(vault, "HashiCorp Vault", "Go", "Secrets management and dynamic mTLS PKI")
-        System(keycloak, "Keycloak", "Java", "Identity and Access Management, Enterprise RBAC")
     }
     
     System_Ext(ehr, "EHR System", "Hospital Electronic Health Records")
     
     Rel(practitioner, api_gw, "Streams audio via WebSockets", "WSS")
-    Rel(practitioner, keycloak, "Authenticates and gets JWT", "HTTPS")
-    Rel(api_gw, keycloak, "Validates JWT / RBAC", "mTLS")
-    Rel(api_gw, vault, "Fetches dynamic DB/API credentials", "mTLS")
-    Rel(api_gw, kafka, "Publishes raw chunks", "mTLS")
-    Rel(api_gw, redis, "Buffers state & sessions", "mTLS")
-    Rel(kafka, audio_proc, "Consumes raw chunks", "mTLS")
-    Rel(audio_proc, redis, "Reassembles chunks", "mTLS")
-    Rel(audio_proc, kafka, "Publishes preprocessed audio", "mTLS")
-    Rel(kafka, stt, "Consumes preprocessed audio", "mTLS")
-    Rel(stt, kafka, "Publishes transcripts", "mTLS")
-    Rel(kafka, nlp, "Consumes transcripts", "mTLS")
-    Rel(nlp, kafka, "Publishes SOAP notes", "mTLS")
-    Rel(kafka, fhir, "Consumes SOAP notes", "mTLS")
+    Rel(api_gw, kafka, "Publishes raw chunks", "TCP")
+    Rel(api_gw, redis, "Buffers state & sessions", "TCP")
+    Rel(kafka, audio_proc, "Consumes raw chunks", "TCP")
+    Rel(audio_proc, redis, "Reassembles chunks", "TCP")
+    Rel(audio_proc, kafka, "Publishes preprocessed audio", "TCP")
+    Rel(kafka, stt, "Consumes preprocessed audio", "TCP")
+    Rel(stt, kafka, "Publishes transcripts", "TCP")
+    Rel(kafka, nlp, "Consumes transcripts", "TCP")
+    Rel(nlp, kafka, "Publishes SOAP notes", "TCP")
+    Rel(kafka, fhir, "Consumes SOAP notes", "TCP")
     Rel(fhir, ehr, "Pushes FHIR R4 resources", "HTTPS")
 ```
 
@@ -51,7 +45,7 @@ C4Context
 
 ### Context
 
-Svaani requires both high-performance network services (WebSocket ingestion, FHIR API integration) and GPU-accelerated ML inference (speech recognition, speaker diarization, clinical NLP). No single language excels at both.
+Kraionyx requires both high-performance network services (WebSocket ingestion, FHIR API integration) and GPU-accelerated ML inference (speech recognition, speaker diarization, clinical NLP). No single language excels at both.
 
 ### Decision
 
@@ -63,7 +57,7 @@ Use **Go** for network-bound services and **Python** for ML/AI services.
 | FHIR Adapter | Go | Strong HTTP client, type safety for FHIR resource construction |
 | Audio Processor | Python | Pyannote (10s buffers, O(1) role map) |
 | STT Engine | Python | OpenAI Whisper Large-V3 (LoRA) + IndicTrans2/IndicXlit |
-| Clinical NLP | Python | Multi-Agent Workflow (Sarvam API) + ChromaDB (BGE-m3) |
+| Clinical NLP | Python | Multi-Agent Workflow (Llama-3.1-8B-Instruct/Sarvam-1) + BGE-m3 LRU |
 
 ### Consequences
 
@@ -198,7 +192,7 @@ Use **OpenAI Whisper Large-V3** with **LoRA support** for the STT Engine, alongs
 
 ---
 
-## ADR-006: Agentic Workflow (Sarvam API) & BGE-m3 RAG Over Basic RAG
+## ADR-006: Agentic Workflow (Llama-3.1/Sarvam-1) & BGE-m3 RAG Over Basic RAG
 
 **Status:** Accepted
 **Date:** 2026-06
@@ -209,11 +203,11 @@ Generating SOAP notes in a single LLM pass (previously MedGemma) led to hallucin
 
 ### Decision
 
-Implement an **Agentic Workflow** using the **Sarvam API**, while upgrading the Vector DB to use **ChromaDB with BGE-m3 embeddings**.
+Implement an **Agentic Workflow** using **Llama-3.1-8B-Instruct and Sarvam-1**, while upgrading the Vector DB to use **BGE-m3 embeddings with an LRU cache eviction policy**.
 
 ### Rationale
 
-- **Multi-Agent Pipeline**: Uses top-tier APIs tailored for reasoning and Indic context.
+- **Multi-Agent Pipeline**: Uses top-tier 8B instruct models tailored for reasoning and Indic context.
   - *Extractor*: Extracts entities using Presidio for PHI and LLM for symptoms/vitals.
   - *Synthesizer*: Drafts the SOAP note incorporating RAG data.
   - *Verifier*: Cross-checks the draft against the original transcript.
@@ -221,8 +215,8 @@ Implement an **Agentic Workflow** using the **Sarvam API**, while upgrading the 
 
 ### Consequences
 
-- **Positive**: Drastic reduction in hallucinations, high clinical safety, multi-lingual RAG support. Extremely low VRAM requirements since LLM runs offsite.
-- **Negative**: Hard dependency on external Sarvam API availability and network latency. (Mitigated by Tenacity exponential backoff/circuit breakers in the workflow)
+- **Positive**: Drastic reduction in hallucinations, high clinical safety, multi-lingual RAG support.
+- **Negative**: Increased VRAM requirements (~24 GB) for holding Llama-3.1-8B-Instruct in memory alongside BGE-m3.
 
 ---
 
@@ -378,154 +372,3 @@ Implement **Microsoft Presidio** acting primarily through optimized regex behavi
 
 - **Positive**: Increased confidence in HIPAA and DPDPA compliance, lower false-negative rates for PHI leakage.
 - **Negative**: Requires careful tuning to avoid over-redacting valid clinical terms.
-
----
-
-## ADR-013: Zero-Trust mTLS Inter-Service Communication
-
-**Status:** Accepted
-**Date:** 2026-06
-
-### Context
-
-To meet Tier-1 Production standard security, internal network isolation (Docker networks/Kubernetes namespaces) is insufficient against lateral movement.
-
-### Decision
-
-Enforce **mTLS (Mutual TLS)** across all internal service communications, managed via automated PKI.
-
-### Rationale
-
-- Ensures strict identity verification and encryption in transit for every internal hop.
-- Mitigates insider threats and limits the blast radius of a compromised container.
-
-### Consequences
-
-- **Positive**: Hardened zero-trust architecture.
-- **Negative**: Adds overhead to internal network calls and increases complexity in certificate lifecycle management.
-
----
-
-## ADR-014: Enterprise-Grade RBAC with Keycloak
-
-**Status:** Accepted
-**Date:** 2026-06
-
-### Context
-
-As Svaani is deployed across varied hospital networks, we need an identity provider capable of federating with hospital Active Directories (LDAP, SAML, OIDC) while providing granular RBAC (Role-Based Access Control).
-
-### Decision
-
-Implement **Keycloak** as the primary Identity and Access Management (IAM) and RBAC solution.
-
-### Rationale
-
-- **Federation**: Easily integrates with existing healthcare identity systems.
-- **Granular RBAC**: Allows strict control over who can view transcripts, push to EHRs, or manage system configuration.
-- **Standardized**: Issues JWTs that all downstream services can validate statelessly.
-
-### Consequences
-
-- **Positive**: Offloads complex auth logic from the API Gateway, standardizes enterprise integration.
-- **Negative**: Adds a heavyweight Java service to the infrastructure footprint.
-
----
-
-## ADR-015: Secrets Management with HashiCorp Vault
-
-**Status:** Accepted
-**Date:** 2026-06
-
-### Context
-
-Hardcoding secrets in `.env` files or relying purely on Kubernetes Secrets (which are base64 encoded by default) doesn't meet our strict compliance rules. We need centralized secret rotation and dynamic certificate provisioning for mTLS.
-
-### Decision
-
-Adopt **HashiCorp Vault** for centralized secrets management and PKI for dynamic mTLS certificates.
-
-### Rationale
-
-- Provides secure storage with encryption-at-rest for EHR API keys, database credentials, and Master Encryption Keys.
-- Functions as an internal CA, issuing short-lived mTLS certificates dynamically to services on boot.
-
-### Consequences
-
-- **Positive**: Simplifies compliance audits, automates key rotation, ensures secrets are injected only at runtime.
-- **Negative**: Introduces a critical dependency; if Vault goes down, services cannot boot or rotate keys.
-
----
-
-## ADR-016: Structured JSON Logging (structlog)
-
-**Status:** Accepted
-**Date:** 2026-06
-
-### Context
-
-Standard Python logging outputs raw strings which are difficult to parse in ELK/Datadog stacks, and traceback formatting can span multiple lines making trace-id correlation impossible.
-
-### Decision
-
-Adopt **structlog** and **python-json-logger** across all Python microservices to enforce strictly typed JSON logging.
-
-### Rationale
-
-- Ensures all logs are machine-readable and strictly keyed with `trace_id` and `tenant_id`.
-- Intercepts uncaught exceptions and prints them as structured single-line JSON events.
-
-### Consequences
-
-- **Positive**: Exceptional observability, zero log-parsing issues in Logstash/FluentBit, immediate correlation of errors.
-- **Negative**: Minor learning curve for developers used to `logging.info("msg %s", var)`.
-
----
-
-## ADR-017: Durable Postgres Consent Store
-
-**Status:** Accepted
-**Date:** 2026-06
-
-### Context
-
-Relying on `InMemoryStore` for tracking patient consent approvals exposes the platform to catastrophic data loss on restart, violating strict HIPAA rules around auditing and durability of patient consent records.
-
-### Decision
-
-Implement a durable **PostgresConsentStore** backing the consent service interface.
-
-### Rationale
-
-- Ensures consent transactions are ACID compliant and durably persisted.
-- Protects the system against pod evictions and restarts, maintaining a permanent audit trail of grants and revocations.
-
-### Consequences
-
-- **Positive**: HIPAA/DPDPA compliant persistent consent tracking.
-- **Negative**: Adds PostgreSQL dependency to the data plane, requiring database migrations and connection management.
-
----
-
-## ADR-018: Strict Nil-Check on Rate Limiter Storage
-
-**Status:** Accepted
-**Date:** 2026-06
-
-### Context
-
-If the Fiber rate limiter fails to connect to Redis during startup and falls back to a nil store, it silently degrades to an in-memory fallback. This can lead to local-only rate limiting, bypassing global limits in a horizontally scaled environment.
-
-### Decision
-
-Enforce a strict nil-check (`store == nil`) and `log.Fatal` panic on startup if the Redis connection is unavailable.
-
-### Rationale
-
-- In a medical-grade system, it's safer to fail loud and refuse to start rather than run in a degraded, vulnerable state.
-- Prevents split-brain rate limits across multiple gateway replicas.
-
-### Consequences
-
-- **Positive**: Enforces global API rate limiting consistently.
-- **Negative**: Hard dependency on Redis availability during Gateway boot.
