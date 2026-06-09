@@ -8,7 +8,7 @@ roles (Doctor / Patient) based on speaking-order heuristics.
 from __future__ import annotations
 
 import io
-import logging
+import structlog
 import tempfile
 from typing import Any, Optional
 
@@ -16,7 +16,7 @@ import numpy as np
 import soundfile as sf
 import torch
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class SpeakerDiarizer:

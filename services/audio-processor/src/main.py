@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import gc
 import json
-import logging
+import structlog
 import signal
 import struct
 import sys
@@ -32,7 +32,7 @@ from .diarization import SpeakerDiarizer
 from .noise_reduction import NoiseReducer
 from .producer import AudioProducer
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Prometheus metrics
 MESSAGES_PROCESSED = Counter("messages_processed_total", "Total messages processed")

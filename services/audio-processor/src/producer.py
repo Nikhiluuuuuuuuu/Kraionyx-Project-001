@@ -6,7 +6,7 @@ Publishes preprocessed audio chunks and pipeline error events.
 from __future__ import annotations
 
 import json
-import logging
+import structlog
 from typing import Any
 
 from confluent_kafka import Producer
@@ -15,7 +15,7 @@ from svaani_common.models import PipelineError
 
 from .config import Config
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def _delivery_callback(err: Any, msg: Any) -> None:

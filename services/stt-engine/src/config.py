@@ -1,9 +1,9 @@
 import os
-import logging
+import structlog
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 @dataclass
 class Config:

@@ -1,4 +1,4 @@
-import logging
+import structlog
 import os
 import time
 import redis

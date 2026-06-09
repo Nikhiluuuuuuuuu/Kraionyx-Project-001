@@ -1,10 +1,10 @@
 import json
-import logging
+import structlog
 import os
 from typing import List, Dict
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 def evaluate_extraction(test_cases: List[Dict]) -> Dict:
     results = []

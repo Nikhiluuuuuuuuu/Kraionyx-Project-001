@@ -8,7 +8,7 @@ user-supplied handler callback.
 from __future__ import annotations
 
 import json
-import logging
+import structlog
 from typing import Callable
 
 from confluent_kafka import Consumer, KafkaError, KafkaException, Message
@@ -17,7 +17,7 @@ from svaani_common.models import AudioChunkMessage
 
 from .config import Config
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class AudioConsumer:

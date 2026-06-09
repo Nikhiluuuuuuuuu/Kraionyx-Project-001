@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import logging
+import structlog
 import os
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclass

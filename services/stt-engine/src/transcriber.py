@@ -3,9 +3,9 @@ import requests
 import io
 import os
 import soundfile as sf
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 class MedicalTranscriber:
     """

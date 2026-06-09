@@ -1,4 +1,4 @@
-import logging
+import structlog
 import os
 import threading
 import time
@@ -18,7 +18,7 @@ from src.pii_redactor import PIIRedactor
 from .config import Config
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # RED Metrics
 MESSAGES_PROCESSED = Counter("clinical_nlp_messages_processed_total", "Total Clinical NLP messages processed")

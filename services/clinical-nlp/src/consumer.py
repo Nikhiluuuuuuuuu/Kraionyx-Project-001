@@ -1,9 +1,9 @@
 import json
-import logging
+import structlog
 from confluent_kafka import Consumer as KafkaConsumer
 from .config import Config
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 class ClinicalConsumer:
     def __init__(self, config: Config):
