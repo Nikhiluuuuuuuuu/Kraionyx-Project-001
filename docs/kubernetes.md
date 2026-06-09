@@ -26,13 +26,12 @@ deploy/helm/
 ├── svaani/
 │   ├── Chart.yaml
 │   ├── values.yaml
-│   ├── charts/
-│   │   ├── api-gateway/
-│   │   ├── audio-processor/
-│   │   ├── stt-engine/
-│   │   ├── clinical-nlp/
-│   │   └── fhir-adapter/
-│   └── templates/
+│   ├── templates/
+│   │   ├── api-gateway-deployment.yaml
+│   │   ├── audio-processor-deployment.yaml
+│   │   ├── stt-engine-deployment.yaml
+│   │   ├── clinical-nlp-deployment.yaml
+│   │   └── fhir-adapter-deployment.yaml
 ```
 
 ## Deployment Steps
@@ -52,7 +51,8 @@ kubectl label namespace svaani-prod istio-injection=enabled
 
 ### 3. Deploy using Helm
 
-Customize the `values.yaml` file according to your environment. Specifically, update Vault addresses, image tags, and resource limits.
+Customize the `values.yaml` file according to your environment. Specifically, update Vault addresses, image tags, and resource limits. 
+**Note:** With the migration to Sarvam AI APIs, GPU node pools are no longer required. All services are CPU-bound.
 
 ```bash
 helm upgrade --install svaani ./deploy/helm/svaani \
