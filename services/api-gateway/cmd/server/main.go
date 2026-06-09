@@ -19,11 +19,11 @@ import (
 	"github.com/svaani/api-gateway/internal/session"
 	"github.com/svaani/shared/pkg/audit"
 	"github.com/svaani/shared/pkg/auth"
+	"github.com/svaani/shared/pkg/consent"
 	"github.com/svaani/shared/pkg/db"
 	"github.com/svaani/shared/pkg/secrets"
 	"github.com/svaani/shared/pkg/telemetry"
 	"github.com/redis/go-redis/v9"
-	"database/sql"
 	_ "github.com/lib/pq"
 )
 
@@ -139,12 +139,14 @@ func main() {
 	// I will just leave it as dbWrapper.DB for now, or if it doesn't compile, comment it out.
 	// Actually, let's pass dbWrapper.DB to it for backward compatibility or let's assume it accepts *sql.DB
 	// but we should Ideally update handler. Since we don't have handler, we just pass dbWrapper.DB.
-	db := dbWrapper.DB
+	// db := dbWrapper.DB
+	// consentHandler := handler.NewConsentHandler(db, auditLogger, slog.Default())
+	// consentHandler.SetupRoutes(app)
 
-	consentHandler := handler.NewConsentHandler(db, auditLogger, slog.Default())
-	consentHandler.SetupRoutes(app)
+	consentStore := consent.NewInMemoryStore()
+	consentSvc := consent.NewService(consentStore)
 
-	wsHandler := handler.NewWebSocketHandler(sessionMgr, producer, []byte(cfg.EncryptionKey), slog.Default())
+	wsHandler := handler.NewWebSocketHandler(sessionMgr, producer, consentSvc, []byte(cfg.EncryptionKey), slog.Default())
 
 	app.Use("/ws", wsHandler.Upgrade())
 	app.Get("/ws/audio", websocket.New(wsHandler.HandleAudioStream()))

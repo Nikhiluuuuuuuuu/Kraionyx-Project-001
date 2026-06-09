@@ -7,13 +7,11 @@ logger = logging.getLogger(__name__)
 
 class LLMBackend:
     def __init__(self, use_mock=False, model_name="sarvam-1"):
+        # use_mock is kept for API signature but we forcefully default to False in workflow
         self.use_mock = use_mock
         self.model_name = model_name
-        self.api_key = os.getenv("SARVAM_API_KEY", "")
         self.api_url = os.getenv("LLM_API_URL", "https://api.sarvam.ai/text-generate")
-        
-        if not self.use_mock and not self.api_key:
-            logger.warning("SARVAM_API_KEY environment variable is not set. API calls will likely fail.")
+        self.api_key = os.getenv("SARVAM_API_KEY", "")
 
     def generate(self, prompt: str) -> str:
         if self.use_mock:
@@ -28,11 +26,12 @@ class LLMBackend:
             return "Mock response"
         
         headers = {
-            "api-subscription-key": self.api_key,
             "Content-Type": "application/json"
         }
-        
-        # Invoke actual LLM (e.g., Sarvam-1)
+        if self.api_key:
+            headers["api-subscription-key"] = self.api_key
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            
         payload = {
             "model": self.model_name,
             "prompt": prompt,
@@ -41,14 +40,10 @@ class LLMBackend:
         }
         
         try:
-            response = requests.post(self.api_url, headers=headers, json=payload, timeout=15)
+            response = requests.post(self.api_url, headers=headers, json=payload, timeout=30)
             response.raise_for_status()
-            
-            # The exact response format depends on Sarvam AI. 
-            # Often it's similar to OpenAI: {"choices": [{"text": "..."}]} or similar.
             result = response.json()
             
-            # Attempt to handle common response formats
             if "choices" in result:
                 choice = result["choices"][0]
                 if "text" in choice:
@@ -62,5 +57,5 @@ class LLMBackend:
                 
             return json.dumps(result)
         except Exception as e:
-            logger.error(f"Failed to invoke {self.model_name}: {e}")
-            return f'{{"error": "Failed to invoke {self.model_name}: {str(e)}"}}'
+            logger.error(f"API request failed: {e}")
+            return f'{{"error": "API generation failed: {str(e)}"}}'

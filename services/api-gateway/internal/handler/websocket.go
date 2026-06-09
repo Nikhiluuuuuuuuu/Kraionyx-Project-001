@@ -9,10 +9,13 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
+	"github.com/svaani/shared/pkg/consent"
 	"github.com/svaani/shared/pkg/crypto"
 	"github.com/svaani/shared/pkg/models"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/svaani/api-gateway/internal/kafka"
+	"github.com/svaani/api-gateway/internal/session"
 )
 
 var (
@@ -28,9 +31,6 @@ var (
 		Name: "svaani_ws_chunks_processed_total",
 		Help: "The total number of audio chunks successfully processed",
 	})
-
-	"github.com/svaani/api-gateway/internal/kafka"
-	"github.com/svaani/api-gateway/internal/session"
 )
 
 const (
@@ -73,6 +73,7 @@ type errorMessage struct {
 type WebSocketHandler struct {
 	sessionMgr    *session.Manager
 	producer      *kafka.Producer
+	consentSvc    *consent.Service
 	encryptionKey []byte
 	logger        *slog.Logger
 }
@@ -94,12 +95,14 @@ type Client struct {
 func NewWebSocketHandler(
 	sessionMgr *session.Manager,
 	producer *kafka.Producer,
+	consentSvc *consent.Service,
 	encryptionKey []byte,
 	logger *slog.Logger,
 ) *WebSocketHandler {
 	return &WebSocketHandler{
 		sessionMgr:    sessionMgr,
 		producer:      producer,
+		consentSvc:    consentSvc,
 		encryptionKey: encryptionKey,
 		logger:        logger.With(slog.String("component", "websocket_handler")),
 	}
@@ -262,6 +265,18 @@ func (c *Client) handleTextMessage(msg []byte) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+
+		hasConsent, err := c.handler.consentSvc.CheckAccess(ctx, ctrl.PatientID, "svaani-api", consent.ConsentTypeMedicalRecords)
+		if err != nil {
+			c.logger.Error("failed to verify consent", slog.String("error", err.Error()))
+			c.sendError("failed to verify patient consent")
+			return
+		}
+		if !hasConsent {
+			c.logger.Warn("session rejected due to missing active consent", slog.String("patient_id", ctrl.PatientID))
+			c.sendError("active medical records consent is required to start session")
+			return
+		}
 
 		sess, err := c.handler.sessionMgr.CreateSession(
 			ctx,

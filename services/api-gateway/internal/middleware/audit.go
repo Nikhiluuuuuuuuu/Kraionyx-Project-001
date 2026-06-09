@@ -19,13 +19,13 @@ func AuditMiddleware(logger *audit.Logger) fiber.Handler {
 
 		switch c.Method() {
 		case fiber.MethodGet, fiber.MethodHead, fiber.MethodOptions:
-			logger.LogAccess(c.Context(), userID, "HTTP_ENDPOINT", c.Path(), detail, c.IP())
+			logger.LogAccess(c.Context(), "default_tenant", userID, "HTTP_ENDPOINT", c.Path(), detail, c.IP())
 		case fiber.MethodPost, fiber.MethodPut, fiber.MethodPatch:
-			logger.LogModification(c.Context(), userID, audit.ActionUpdate, "HTTP_ENDPOINT", c.Path(), detail, c.IP())
+			logger.LogModification(c.Context(), "default_tenant", userID, audit.ActionUpdate, "HTTP_ENDPOINT", c.Path(), detail, c.IP())
 		case fiber.MethodDelete:
-			logger.LogDeletion(c.Context(), userID, "HTTP_ENDPOINT", c.Path(), detail, c.IP())
+			logger.LogDeletion(c.Context(), "default_tenant", userID, "HTTP_ENDPOINT", c.Path(), detail, c.IP())
 		default:
-			logger.LogAccess(c.Context(), userID, "HTTP_ENDPOINT", c.Path(), detail, c.IP())
+			logger.LogAccess(c.Context(), "default_tenant", userID, "HTTP_ENDPOINT", c.Path(), detail, c.IP())
 		}
 
 		return err
