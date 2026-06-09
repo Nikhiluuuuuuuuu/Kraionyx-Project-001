@@ -222,7 +222,7 @@ Implement an **Agentic Workflow** using the **Sarvam API**, while upgrading the 
 ### Consequences
 
 - **Positive**: Drastic reduction in hallucinations, high clinical safety, multi-lingual RAG support. Extremely low VRAM requirements since LLM runs offsite.
-- **Negative**: Hard dependency on external Sarvam API availability and network latency.
+- **Negative**: Hard dependency on external Sarvam API availability and network latency. (Mitigated by Tenacity exponential backoff/circuit breakers in the workflow)
 
 ---
 
