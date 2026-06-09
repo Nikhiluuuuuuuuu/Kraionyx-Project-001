@@ -1,4 +1,4 @@
-module kraionyx-loadtest
+module svaani-loadtest
 
 go 1.26.3
 
