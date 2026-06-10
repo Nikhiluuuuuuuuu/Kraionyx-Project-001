@@ -7,6 +7,9 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+class TranscriptionError(Exception):
+    pass
+
 class MedicalTranscriber:
     """
     High-performance speech-to-text (STT) transcription engine utilizing 
@@ -93,11 +96,13 @@ class MedicalTranscriber:
                 "translated_text": translated_text
             }
 
+        except requests.exceptions.Timeout:
+            logger.error("Sarvam API timed out after 60s")
+            raise TranscriptionError("Sarvam API timed out after 60s")
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Sarvam API returned HTTP {e.response.status_code}")
+            raise TranscriptionError(f"Sarvam API returned HTTP {e.response.status_code}")
         except Exception as e:
-            logger.error(f"Error calling Sarvam STT API: {e}")
-            return {
-                "text": "",
-                "processed_text": "",
-                "translated_text": ""
-            }
+            logger.error(f"Unexpected transcription failure: {e}")
+            raise TranscriptionError(f"Unexpected transcription failure: {e}")
 
