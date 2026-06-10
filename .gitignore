@@ -125,3 +125,5 @@ services/*/results/
 .terraform/
 *.tfvars
 !*.tfvars.example
+
+*_generated.json
