@@ -46,7 +46,10 @@ jobs:
           gosec -exclude-dir=tests ./...
 
       - name: Run Tests
-        run: go test -v -race -coverprofile=coverage.out ./...
+        run: |
+          go test -v -race -coverprofile=coverage.out ./...
+          coverage=$(go test -cover ./... | grep -oP 'coverage: \K[0-9]+(?=\.[0-9]+%)' || echo "0")
+          if [ -n "$coverage" ] && [ "$coverage" -lt 80 ]; then echo "Coverage $coverage% is below 80%"; exit 1; fi
 
   python-services:
     name: Build, Lint, Test & Scan (Python)
@@ -127,3 +130,16 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+
+      - name: Generate SBOM
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'kraionyx/${{ matrix.service }}:${{ github.sha }}'
+          format: 'cyclonedx'
+          output: 'sbom-${{ matrix.service }}.json'
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.service }}
+          path: sbom-${{ matrix.service }}.json
