@@ -175,6 +175,7 @@ svaani/
 │   ├── helm/                       # Kubernetes Helm charts (Istio + Vault injection)
 │   └── observability/              # OpenTelemetry, Prometheus, and Grafana stack
 ├── docs/
+│   ├── iec62304/                   # IEC 62304 & FDA SaMD Regulatory Artifacts
 │   ├── architecture.md             # Architecture decision records
 │   ├── security.md                 # Security & compliance documentation
 │   ├── api.md                      # API reference
