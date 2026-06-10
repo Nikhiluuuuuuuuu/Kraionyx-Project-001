@@ -20,10 +20,11 @@ Engineered for extreme reliability, the platform targets Tier-1 Production stand
 The platform has been upgraded to a 10/10 Tier-1 production level with the following architectural enhancements:
 
 - **Advanced Observability**: Full OpenTelemetry distributed tracing and a Prometheus/Grafana stack located in `deploy/observability`. Enterprise structured JSON logging via `structlog` is enabled across all Python microservices.
-- **Kubernetes Orchestration**: Production-ready Helm charts (`deploy/helm/`) featuring Istio mTLS and dynamic HashiCorp Vault sidecar injection.
-- **Robust CI/CD & Security**: Automated GitHub Actions pipelines incorporating Trivy and gosec security scanning, alongside a strict 70% test coverage gate.
-- **Medical AI Benchmarking**: Comprehensive validation suites for WER (Word Error Rate) and Clinical Entity Evaluation integrated within `services/clinical-nlp` and `services/stt-engine`.
-- **Compliance & Privacy**: Dedicated Patient Consent Module (`shared/go/pkg/consent`) and automated Vault key rotation scripts for strict lifecycle management.
+- **Kubernetes Orchestration & CD**: Production-ready Helm charts (`deploy/helm/`) featuring Istio mTLS and dynamic HashiCorp Vault sidecar injection. Automated CD pipeline (`cd.yml`) deploys all services to a staging namespace on merge to `main`.
+- **Robust CI & Security**: Automated GitHub Actions pipelines incorporating Trivy and gosec security scanning, alongside a strict 70% test coverage gate. CI matrix optimally handles both Go and Python workflows.
+- **Database Migrations**: Versioned up/down SQL scripts inside `migrations/` ensuring safe schema rollbacks.
+- **Medical AI Benchmarking & QA**: Comprehensive validation suites for WER and Clinical Entity Evaluation. Deep QA folder (`tests/qa/`) with automated load testing (Locust), chaos engineering (Kafka consumer DLQ routing), and E2E mock pipelines.
+- **Compliance & Privacy**: Real Presidio PII Redactor fully integrated for PHI stripping. Dedicated Patient Consent Module (`shared/go/pkg/consent`) and automated Vault key rotation scripts for strict lifecycle management.
 
 ---
 
@@ -191,15 +192,19 @@ svaani/
 ├── services/
 │   ├── api-gateway/                # Go — WebSocket ingestion + REST API (100 msg/sec rate limit)
 │   ├── audio-processor/            # Python — 500ms chunking into 10s windows, O(1) hash map speaker roles, Pyannote
-│   ├── stt-engine/                 # Python — Whisper Large-V3 (LoRA) + IndicTrans2/IndicXlit
-│   ├── clinical-nlp/               # Python — Sarvam API + ChromaDB (BGE-m3)
+│   ├── stt-engine/                 # Python — CUDA-accelerated STT Engine (DLQ routing & explicit error handling)
+│   ├── clinical-nlp/               # Python — Multi-stage production Dockerfile, Sarvam API + ChromaDB (BGE-m3)
 │   └── fhir-adapter/               # Go — FHIR R4 EHR integration (Backoff & DLQ)
 ├── shared/
 │   └── go/pkg/consent/             # Patient Consent Module & Vault Key Rotation
 ├── tests/
-│   └── qa/                         # Load testing, chaos engineering, and fuzzing
+│   ├── clinical-nlp/               # Clinical NLP unit tests with monkeypatching
+│   └── qa/                         # Comprehensive QA suite
+│       ├── chaos/                  # Chaos engineering (e.g., Kafka failure & DLQ tests)
+│       ├── load/                   # Load testing (e.g., Locust WebSocket audio-streaming)
+│       └── data_generator/         # Test data generation tools
 ├── .env.example                    # Environment variable template
-├── .gitignore                      # Comprehensive gitignore
+├── .gitignore                      # Comprehensive gitignore (ignores service results)
 ├── Makefile                        # Build, test, and deployment automation
 └── README.md                       # This file
 ```
