@@ -131,7 +131,7 @@ graph TB
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/svaani/svaani.git
+git clone https://github.com/Nikhiluuuuuuuuu/Kraionyx-Project-001.git
 cd svaani
 
 # 2. Configure environment
