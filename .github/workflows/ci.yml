@@ -47,9 +47,10 @@ jobs:
 
       - name: Run Tests
         run: |
-          go test -v -race -coverprofile=coverage.out ./...
-          coverage=$(go test -cover ./... | grep -oP 'coverage: \K[0-9]+(?=\.[0-9]+%)' || echo "0")
-          if [ -n "$coverage" ] && [ "$coverage" -lt 80 ]; then echo "Coverage $coverage% is below 80%"; exit 1; fi
+          go install gotest.tools/gotestsum@latest
+          gotestsum -- -coverprofile=coverage.out ./...
+          coverage=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
+          awk -v cov="$coverage" 'BEGIN { if (cov < 80.0) { print "Coverage " cov "% is below 80.0%"; exit 1 } }'
 
   python-services:
     name: Build, Lint, Test & Scan (Python)
@@ -95,7 +96,7 @@ jobs:
       - name: Run Tests
         env:
           SARVAM_API_KEY: dummy_key_for_ci
-        run: pytest -v --cov=. --cov-fail-under=70
+        run: pytest -v --cov=. --cov-fail-under=80
 
   docker-build-and-scan:
     name: Build and Scan Docker Images
