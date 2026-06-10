@@ -79,3 +79,5 @@ def test_full_pipeline_mock():
     assert "01/01/1980" not in redacted_transcript
     assert fhir_bundle["entry"][0]["resource"]["resourceType"] == "Condition"
     assert fhir_bundle["entry"][0]["resource"]["code"]["text"] == "headache"
+
+# minor test suite update
