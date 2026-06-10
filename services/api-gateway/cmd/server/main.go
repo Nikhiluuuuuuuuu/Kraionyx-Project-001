@@ -153,7 +153,7 @@ func main() {
 	consentStore := consent.NewInMemoryStore()
 	consentSvc := consent.NewService(consentStore)
 
-	wsHandler := handler.NewWebSocketHandler(sessionMgr, producer, consentSvc, []byte(cfg.EncryptionKey), slog.Default())
+	wsHandler := handler.NewWebSocketHandler(sessionMgr, producer, consentSvc, rdb, []byte(cfg.EncryptionKey), slog.Default())
 
 	app.Use("/ws", wsHandler.Upgrade())
 	app.Get("/ws/audio", websocket.New(wsHandler.HandleAudioStream()))
