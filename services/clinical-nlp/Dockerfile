@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim@sha256:a6fce523c0bdfed5e1b203c73fc5a2105151b54a2608358ea82200dc89dbb166 AS builder
 
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential curl \
@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
 # Stage 2: Runtime
-FROM python:3.11-slim
+FROM python:3.11-slim@sha256:a6fce523c0bdfed5e1b203c73fc5a2105151b54a2608358ea82200dc89dbb166
 
 # Create non-root user
 RUN addgroup --system appgroup && adduser --system --group appuser
