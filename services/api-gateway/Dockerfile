@@ -3,13 +3,16 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o bin/api-gateway ./cmd/server
+ARG VERSION=dev
+RUN go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o bin/api-gateway ./cmd/server
 
 FROM alpine:3.19@sha256:494edff7360579cb513922f6c60ecab4bb267a9b8339f7962f6a78c5c31ec923
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk add --no-cache curl && addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=builder /app/bin/api-gateway .
 RUN chown -R appuser:appgroup /app
 USER appuser
 EXPOSE 8443
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -k -f https://localhost:8443/health || exit 1
 CMD ["./api-gateway"]

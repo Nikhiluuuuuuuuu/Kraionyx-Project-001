@@ -14,6 +14,7 @@ import (
 	"github.com/svaani/shared/pkg/models"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/redis/go-redis/v9"
 	"github.com/svaani/api-gateway/internal/kafka"
 	"github.com/svaani/api-gateway/internal/session"
 )
@@ -74,6 +75,7 @@ type WebSocketHandler struct {
 	sessionMgr    *session.Manager
 	producer      *kafka.Producer
 	consentSvc    *consent.Service
+	rdb           *redis.Client
 	encryptionKey []byte
 	logger        *slog.Logger
 }
@@ -96,6 +98,7 @@ func NewWebSocketHandler(
 	sessionMgr *session.Manager,
 	producer *kafka.Producer,
 	consentSvc *consent.Service,
+	rdb *redis.Client,
 	encryptionKey []byte,
 	logger *slog.Logger,
 ) *WebSocketHandler {
@@ -103,6 +106,7 @@ func NewWebSocketHandler(
 		sessionMgr:    sessionMgr,
 		producer:      producer,
 		consentSvc:    consentSvc,
+		rdb:           rdb,
 		encryptionKey: encryptionKey,
 		logger:        logger.With(slog.String("component", "websocket_handler")),
 	}
@@ -184,13 +188,20 @@ func (c *Client) readPump() {
 			break
 		}
 
-		now := time.Now()
-		if now.Sub(c.lastMsgTime) > time.Second {
-			c.msgCount = 0
-			c.lastMsgTime = now
+		// Redis distributed rate limiting (100 msgs/sec per connection)
+		ip := "unknown"
+		if c.conn.RemoteAddr() != nil {
+			ip = c.conn.RemoteAddr().String()
 		}
-		c.msgCount++
-		if c.msgCount > 100 {
+		limitKey := "ratelimit:ws:" + ip
+		
+		ctx := context.Background()
+		pipe := c.handler.rdb.Pipeline()
+		incr := pipe.Incr(ctx, limitKey)
+		pipe.Expire(ctx, limitKey, time.Second)
+		if _, err := pipe.Exec(ctx); err != nil {
+			c.logger.Error("redis rate limit error", slog.String("error", err.Error()))
+		} else if incr.Val() > 100 {
 			c.sendError("rate limit exceeded")
 			continue
 		}
@@ -403,7 +414,7 @@ func (c *Client) handleBinaryMessage(audioData []byte) {
 		Channels:    1,
 	}
 
-	if err := c.handler.producer.PublishAudioChunk(context.Background(), msg); err != nil {
+	if err := c.handler.producer.PublishAudioChunk(ctx, msg); err != nil {
 		c.logger.Error("failed to publish audio chunk",
 			slog.String("session_id", c.currentSessionID),
 			slog.Int("chunk_index", msgChunkIndex),
