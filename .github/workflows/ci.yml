@@ -144,3 +144,5 @@ jobs:
         with:
           name: sbom-${{ matrix.service }}
           path: sbom-${{ matrix.service }}.json
+
+# CI workflow minor revision
