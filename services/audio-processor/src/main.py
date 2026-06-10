@@ -24,7 +24,8 @@ import redis
 from prometheus_client import start_http_server, Counter, Histogram
 
 from svaani_common.crypto import AES256GCM
-from svaani_common.models import AudioChunkMessage, PipelineError
+from svaani_common.models import AudioChunkMessage as InboundAudioChunkMessage, PipelineError
+from svaani_common.messages import AudioChunkMessage as OutboundAudioChunkMessage
 
 from .config import Config
 from .consumer import AudioConsumer
@@ -143,7 +144,7 @@ def main() -> None:
     session_buffers: dict[str, list[np.ndarray]] = {}
 
     @PROCESSING_TIME.time()
-    def handle_message(msg: AudioChunkMessage) -> None:
+    def handle_message(msg: InboundAudioChunkMessage) -> None:
         """Process a single audio chunk through the pipeline.
 
         Steps:
@@ -204,25 +205,18 @@ def main() -> None:
             )
             diarization_segments = diarizer.assign_roles(diarization_segments)
 
-            # 6. Re-encrypt processed audio
-            processed_pcm = _float32_to_pcm16(cleaned_audio)
-            encrypted_audio = crypto.encrypt(processed_pcm)
+            # 6. Build and publish result using the shared Pydantic contract
+            result_msg = OutboundAudioChunkMessage(
+                session_id=session_id,
+                audio=cleaned_audio.tolist(),
+                sample_rate=config.sample_rate,
+                chunk_index=msg.chunk_index
+            )
 
-            # 7. Build and publish result
-            result: dict[str, Any] = {
-                "session_id": session_id,
-                "chunk_index": msg.chunk_index,
-                "timestamp_ms": msg.timestamp_ms,
-                "audio_data": encrypted_audio,
-                "format": msg.format,
-                "sample_rate": config.sample_rate,
-                "channels": msg.channels,
-                "diarization": diarization_segments,
-            }
             producer.produce(
                 topic=config.kafka_output_topic,
                 key=session_id,
-                message=result,
+                message=result_msg.model_dump(),
             )
 
             MESSAGES_PROCESSED.inc()
