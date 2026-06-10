@@ -1,4 +1,4 @@
-name: Third-Party Security Penetration Test (OWASP ZAP)
+name: Automated DAST Scan (OWASP ZAP)
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   zap_scan:
-    name: Run OWASP ZAP Penetration Test
+    name: Run OWASP ZAP DAST Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -17,8 +17,8 @@ jobs:
         run: |
           # In a real environment, we would spin up the services to scan them
           echo "Starting isolated test environment for penetration testing..."
-          # docker-compose -f docker-compose.yml up -d
-          # sleep 30
+          docker-compose -f docker-compose.yml up -d
+          sleep 30
 
       - name: OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.10.0
@@ -30,8 +30,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Generate Pentest Report
+      - name: Generate DAST Report
         if: always()
         run: |
-          echo "CERT-In empanelled grade penetration test completed."
+          echo "Automated DAST scan completed."
           echo "Report generated and available in job artifacts."
