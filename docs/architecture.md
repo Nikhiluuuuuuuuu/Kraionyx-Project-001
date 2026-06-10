@@ -392,3 +392,5 @@ Implement **Microsoft Presidio** acting primarily through optimized regex behavi
 
 - **Positive**: Increased confidence in HIPAA and DPDPA compliance, lower false-negative rates for PHI leakage.
 - **Negative**: Requires careful tuning to avoid over-redacting valid clinical terms.
+
+<!-- Architecture doc minor revision -->
