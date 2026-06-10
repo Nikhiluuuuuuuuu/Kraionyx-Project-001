@@ -123,7 +123,7 @@ jobs:
           tags: kraionyx/${{ matrix.service }}:${{ github.sha }}
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: 'kraionyx/${{ matrix.service }}:${{ github.sha }}'
           format: 'table'
@@ -133,7 +133,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Generate SBOM
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: 'kraionyx/${{ matrix.service }}:${{ github.sha }}'
           format: 'cyclonedx'
@@ -145,4 +145,29 @@ jobs:
           name: sbom-${{ matrix.service }}
           path: sbom-${{ matrix.service }}.json
 
-# CI workflow minor revision
+  vault-rotation-test:
+    name: Vault Key Rotation Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up HashiCorp Vault
+        uses: hashicorp/setup-vault@v3
+        with:
+          vault-version: '1.15.0'
+
+      - name: Start Dev Vault Server and Test Rotation
+        run: |
+          vault server -dev -dev-root-token-id=root &
+          sleep 3
+          export VAULT_ADDR='http://127.0.0.1:8200'
+          export VAULT_TOKEN='root'
+          
+          # Setup Transit engine
+          vault secrets enable transit
+          vault write -f transit/keys/svaani-app-key
+          
+          # Run the rotation script
+          chmod +x scripts/security/vault-key-rotation.sh
+          ./scripts/security/vault-key-rotation.sh
