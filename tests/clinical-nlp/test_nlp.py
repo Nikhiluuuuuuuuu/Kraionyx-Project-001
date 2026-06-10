@@ -39,3 +39,5 @@ def test_clinical_workflow(mock_generate, workflow):
     assert "objective" in result["soap_note"]
     assert "assessment" in result["soap_note"]
     assert "plan" in result["soap_note"]
+
+# minor clinical-nlp test update
