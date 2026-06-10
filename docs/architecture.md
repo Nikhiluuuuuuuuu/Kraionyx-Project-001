@@ -316,12 +316,32 @@ As the platform scales and handles critical health data, standard unit tests are
 
 ### Decision
 
-Introduce a new `tests/qa/` suite encompassing **Load Testing**, **Chaos Engineering**, and **Fuzzing**.
+Introduce a new `tests/qa/` suite encompassing **Load Testing** (Locust), **Chaos Engineering** (Kafka failure tests), and **Data Generation**.
 
 ### Rationale
 
 - Ensures the platform meets high reliability and security standards.
 - Validates the 100 msg/sec rate limits, DLQ recovery, and RAG resilience under stress.
+
+---
+
+## ADR-013: Service-Level DLQ Routing (STT Engine)
+
+**Status:** Accepted
+**Date:** 2026-06
+
+### Context
+
+Previously, the STT Engine silently swallowed processing or API errors, resulting in empty transcripts being pushed to downstream services (like Clinical NLP). This is a critical medical compliance issue.
+
+### Decision
+
+Implement explicit error handling (e.g., `TranscriptionError`) in the STT Engine's processing loop. Any failed transcriptions are routed to a dedicated Dead Letter Queue (DLQ) topic (`transcription.results.dlq`) instead of being silently ignored.
+
+### Rationale
+
+- Ensures that transient transcription failures (e.g., API timeouts) do not result in blank patient records.
+- Enables operational visibility and replay capabilities for failed audio segments.
 
 ---
 
