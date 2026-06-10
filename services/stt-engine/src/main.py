@@ -80,9 +80,11 @@ def main():
                     
                     import numpy as np
                     import json
+                    from svaani_common.messages import AudioChunkMessage
                     
                     payload = json.loads(msg.value())
-                    audio_data = np.array(payload["audio"], dtype=np.float32)
+                    audio_msg = AudioChunkMessage.model_validate(payload)
+                    audio_data = np.array(audio_msg.audio, dtype=np.float32)
                     
                     result = transcriber.transcribe(audio_data)
                     
