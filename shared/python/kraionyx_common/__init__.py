@@ -26,3 +26,5 @@ __all__ = [
     "SpeakerSegment",
     "TranscriptionResultMessage",
 ]
+
+# common lib update
