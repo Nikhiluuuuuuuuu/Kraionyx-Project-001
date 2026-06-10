@@ -1,7 +1,7 @@
 # --------------------------------------------------------------------------
 # Svaani Audio Processor — CPU Dockerfile
 # --------------------------------------------------------------------------
-FROM python:3.11-slim AS base
+FROM python:3.11-slim@sha256:a6fce523c0bdfed5e1b203c73fc5a2105151b54a2608358ea82200dc89dbb166 AS base
 
 LABEL maintainer="Svaani Team" \
       service="audio-processor" \
