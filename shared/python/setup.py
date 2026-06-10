@@ -12,6 +12,7 @@ setup(
     install_requires=[
         "cryptography>=41.0.0",
         "confluent-kafka>=2.3.0",
+        "pydantic>=2.0.0",
     ],
     extras_require={
         "dev": [
