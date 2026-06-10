@@ -78,15 +78,13 @@ def main():
                 try:
                     start_time = time.time()
                     
-                    # Assuming message value is audio data in bytes
-                    audio_data = msg.value()
-                    # (In a real scenario, we might need to parse JSON or convert bytes to np.ndarray)
-                    # For this mock integration, let's assume we can pass a dummy array or process it
-                    # Here we just pass an empty array to trigger the flow (to be filled properly)
                     import numpy as np
-                    dummy_audio = np.zeros(16000, dtype=np.float32)
+                    import json
                     
-                    result = transcriber.transcribe(dummy_audio)
+                    payload = json.loads(msg.value())
+                    audio_data = np.array(payload["audio"], dtype=np.float32)
+                    
+                    result = transcriber.transcribe(audio_data)
                     
                     # Publish result to output topic
                     producer._producer.produce(
